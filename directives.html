@@ -41,6 +41,29 @@
   <script src="directives.js"></script>
   <script src="layout.js"></script>
   <script>
+    let readIds = new Set();
+
+    async function markRead(card) {
+      const id = card.dataset.id;
+      if (readIds.has(id)) return;
+      readIds.add(id);
+      card.classList.remove("is-new");
+      card.querySelector(".chip-gold")?.remove();
+      try {
+        await markDirectivesRead([id]);
+        updateDirectivesDot();
+      } catch (e) { readIds.delete(id); }
+    }
+
+    function toggle(card, open) {
+      const body = card.querySelector(".directive-body");
+      const btn = card.querySelector(".more-btn");
+      body.classList.toggle("is-clamped", !open);
+      btn.textContent = open ? "عرض أقل" : "المزيد";
+      btn.setAttribute("aria-expanded", String(open));
+      if (open) markRead(card);
+    }
+
     (async () => {
       const profile = await requireAuth();
       if (!profile) return;
@@ -49,7 +72,8 @@
 
       const list = document.getElementById("list");
       try {
-        const [items, readIds] = await Promise.all([fetchDirectives(), fetchMyReadDirectiveIds()]);
+        let items;
+        [items, readIds] = await Promise.all([fetchDirectives(), fetchMyReadDirectiveIds()]);
         if (!items.length) {
           list.innerHTML = `<div class="empty"><strong>لا توجد توجيهات</strong></div>`;
           return;
@@ -57,19 +81,42 @@
         list.innerHTML = items.map((d) => {
           const isNew = !readIds.has(d.id);
           return `
-            <article class="card directive ${isNew ? "is-new" : ""}">
+            <article class="card directive ${isNew ? "is-new" : ""}" data-id="${d.id}">
               <div class="directive-meta">
                 <span class="directive-date">${formatDate(d.created_at)}</span>
                 ${isNew ? `<span class="chip chip-gold">جديد</span>` : ""}
               </div>
               <h2 class="directive-title">${escapeHtml(d.title)}</h2>
-              ${d.content ? `<p class="directive-body">${escapeHtml(d.content)}</p>` : ""}
+              ${d.content ? `<p class="directive-body is-clamped">${escapeHtml(d.content)}</p>
+                <button class="more-btn hidden" aria-expanded="false">المزيد</button>` : ""}
             </article>`;
         }).join("");
 
-        // فتح الصفحة = قراءة كل التوجيهات الظاهرة، ثم تختفي نقطة التنبيه
-        const unread = items.filter((d) => !readIds.has(d.id)).map((d) => d.id);
-        if (unread.length) await markDirectivesRead(unread);
+        // التوجيه القصير ينقرأ كامل من أول نظرة = يتسجّل مقروء مباشرة
+        // الطويل يظهر له "المزيد"، وما يتسجّل مقروء إلا لما ينفتح
+        const shortOnes = [];
+        list.querySelectorAll(".directive").forEach((card) => {
+          const body = card.querySelector(".directive-body");
+          const long = body && body.scrollHeight > body.clientHeight + 2;
+          if (long) {
+            card.classList.add("is-expandable");
+            card.querySelector(".more-btn").classList.remove("hidden");
+          } else {
+            body?.classList.remove("is-clamped");
+            if (!readIds.has(card.dataset.id)) shortOnes.push(card);
+          }
+        });
+        if (shortOnes.length) {
+          shortOnes.forEach((c) => readIds.add(c.dataset.id));
+          markDirectivesRead(shortOnes.map((c) => c.dataset.id)).then(updateDirectivesDot).catch(() => {});
+        }
+
+        list.addEventListener("click", (e) => {
+          const card = e.target.closest(".directive.is-expandable");
+          if (!card) return;
+          const open = card.querySelector(".directive-body").classList.contains("is-clamped");
+          toggle(card, open);
+        });
       } catch (e) {
         list.innerHTML = `<div class="empty">تعذر التحميل، تحقق من الاتصال</div>`;
       }

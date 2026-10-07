@@ -60,12 +60,17 @@
             <span class="stat">قرأه ${d.reads} من ${activeUsers}</span>
           </div>
           <h2 class="directive-title">${escapeHtml(d.title)}</h2>
-          ${d.content ? `<p class="directive-body">${escapeHtml(d.content)}</p>` : ""}
+          ${d.content ? `<p class="directive-body is-clamped">${escapeHtml(d.content)}</p>
+            <button class="more-btn hidden" data-more aria-expanded="false">المزيد</button>` : ""}
           <div class="row-actions" style="margin-top:14px">
             <button class="mini-btn" data-act="edit" data-i="${i}" aria-label="تعديل">${svgIcon("edit")}</button>
             <button class="mini-btn danger" data-act="delete" data-i="${i}" aria-label="حذف">${svgIcon("trash")}</button>
           </div>
         </article>`).join("");
+      list.querySelectorAll(".directive-body").forEach((b) => {
+        if (b.scrollHeight > b.clientHeight + 2) b.nextElementSibling.classList.remove("hidden");
+        else b.classList.remove("is-clamped");
+      });
     }
 
     function directiveForm(d) {
@@ -102,6 +107,14 @@
       });
 
       document.getElementById("list").addEventListener("click", async (e) => {
+        const more = e.target.closest("[data-more]");
+        if (more) {
+          const body = more.previousElementSibling;
+          const open = body.classList.toggle("is-clamped") === false;
+          more.textContent = open ? "عرض أقل" : "المزيد";
+          more.setAttribute("aria-expanded", String(open));
+          return;
+        }
         const btn = e.target.closest("button[data-act]");
         if (!btn) return;
         const d = items[Number(btn.dataset.i)];
