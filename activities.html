@@ -58,11 +58,11 @@
       const visible = activities.filter((a) => matchesQuery(query, a.name));
 
       if (!activities.length) {
-        box.innerHTML = `<div class="empty"><strong>لا توجد أنشطة بعد</strong>تظهر هنا بعد ما يضيفها المشرف</div>`;
+        box.innerHTML = `<div class="empty"><strong>لا توجد أنشطة</strong></div>`;
         return;
       }
       if (!visible.length) {
-        box.innerHTML = `<div class="empty"><strong>لا يوجد نشاط بهذا الاسم</strong>جرّب كلمة أقصر أو تهجئة ثانية</div>`;
+        box.innerHTML = `<div class="empty"><strong>لا توجد نتائج</strong></div>`;
         return;
       }
 
@@ -103,7 +103,7 @@
         document.getElementById("countLabel").textContent = `${activities.length} نشاط`;
         render(input.value);
       } catch (e) {
-        document.getElementById("groupsBox").innerHTML = `<div class="empty">تعذر تحميل الأنشطة. تحقق من الاتصال وأعد فتح الصفحة.</div>`;
+        document.getElementById("groupsBox").innerHTML = `<div class="empty">تعذر التحميل، تحقق من الاتصال</div>`;
       }
     })();
   </script>

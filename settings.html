@@ -91,7 +91,7 @@
       if (profile.role === "owner") document.getElementById("usersLink").classList.remove("hidden");
 
       document.getElementById("logoutBtn").addEventListener("click", async () => {
-        const ok = await confirmDialog({ title: "تسجيل الخروج", message: "بتحتاج تدخل بريدك وكلمة المرور مرة ثانية.", confirmText: "تسجيل الخروج", danger: true });
+        const ok = await confirmDialog({ title: "تسجيل الخروج", message: "", confirmText: "تسجيل الخروج", danger: true });
         if (ok) logout();
       });
     })();

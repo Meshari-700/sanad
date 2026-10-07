@@ -4,7 +4,7 @@
 //
 // بالصفحة:
 //   <header id="appHeader"></header> ... <nav id="bottomNav"></nav>
-//   renderShell("home")   // home | directives | settings
+//   renderShell("home")   // home | tools | directives | settings
 // ==================================================================
 
 const APP_NAME = "سند";
@@ -12,6 +12,7 @@ const APP_TAGLINE = "مرجع الاشتراطات للمفتش الميداني
 
 const NAV_TABS = [
   { key: "home", href: "index.html", label: "الرئيسية", icon: "home" },
+  { key: "tools", href: "tools.html", label: "الأدوات", icon: "tool" },
   { key: "directives", href: "directives.html", label: "التوجيهات", icon: "megaphone" },
   { key: "settings", href: "settings.html", label: "الإعدادات", icon: "settings" },
 ];
@@ -35,7 +36,7 @@ function renderBottomNav(activeKey) {
   if (!el) return;
   el.className = "bottom-nav";
   el.setAttribute("aria-label", "التنقل الرئيسي");
-  el.innerHTML = `<div class="bottom-nav-inner">${NAV_TABS.map(
+  el.innerHTML = `<div class="bottom-nav-inner" style="grid-template-columns:repeat(${NAV_TABS.length},1fr)">${NAV_TABS.map(
     (t) => `
       <a href="${t.href}" class="nav-link ${t.key === activeKey ? "active" : ""}" data-tab="${t.key}" ${t.key === activeKey ? 'aria-current="page"' : ""}>
         <span class="nav-icon">${svgIcon(t.icon)}</span>${t.label}

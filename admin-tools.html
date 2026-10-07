@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#126151" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="سند" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="apple-touch-icon" href="icon.png" />
+  <link rel="icon" href="icon.png" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://cttooytoziipdcasliah.supabase.co" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <title>إدارة الأدوات — سند</title>
+</head>
+<body>
+  <header id="appHeader"></header>
+
+  <main class="page">
+    <a class="breadcrumb" href="tools.html" id="crumb">الأدوات</a>
+    <h1 class="page-title" style="margin-bottom:20px">إدارة الأدوات</h1>
+    <div id="box"><div class="card skeleton" style="height:160px"></div></div>
+  </main>
+
+  <nav id="bottomNav"></nav>
+
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="utils.js"></script>
+  <script src="directives.js"></script>
+  <script src="layout.js"></script>
+  <script src="content.js"></script>
+  <script src="tools.js"></script>
+  <script src="admin.js"></script>
+  <script src="admin-ui.js"></script>
+  <script>
+    let tools = [];
+    const KIND_LABEL = { link: "رابط", file: "ملف", builtin: "أداة جاهزة" };
+
+    function render() {
+      document.getElementById("box").innerHTML = `
+        <div class="card list-card">
+          ${tools.map((t, i) => {
+            const kind = toolKind(t);
+            return `
+              <div class="admin-row ${t.is_hidden ? "is-muted" : ""}">
+                <span class="row-icon">${renderEntityIcon(t, kind === "file" ? "file" : kind === "link" ? "link" : "tool")}</span>
+                <span class="grow">
+                  <span class="row-title">${escapeHtml(t.name)}</span>
+                  <span class="row-sub">${KIND_LABEL[kind]}${t.is_hidden ? "، مخفية" : ""}</span>
+                </span>
+                ${rowActionsHtml(i, tools.length)}
+              </div>`;
+          }).join("")}
+          <button class="add-row" data-act="add">${svgIcon("plus", "icon-sm")}إضافة أداة</button>
+        </div>`;
+    }
+
+    function normalizeUrl(u) {
+      const v = (u || "").trim();
+      if (!v) return "";
+      return /^https?:\/\//i.test(v) ? v : "https://" + v;
+    }
+
+    function toolForm(tool) {
+      const isBuiltin = tool && toolKind(tool) === "builtin";
+      const oldKind = tool ? toolKind(tool) : null;
+      const fields = [{ name: "name", label: "اسم الأداة", type: "text", required: true, maxlength: 60 }];
+
+      if (!isBuiltin) {
+        fields.push(
+          { name: "kind", label: "النوع", type: "select", options: [{ value: "link", label: "رابط" }, { value: "file", label: "ملف" }] },
+          {
+            name: "url", label: "الرابط", type: "text", placeholder: "https://", showIf: { field: "kind", value: "link" },
+            validate: (val) => (!val ? "اكتب الرابط." : /^(https?:\/\/)?[^\s.]+\.[^\s]+$/i.test(val) ? "" : "الرابط غير صحيح."),
+          },
+          {
+            name: "file", label: "الملف", type: "file", showIf: { field: "kind", value: "file" },
+            hint: oldKind === "file" ? "اتركه فاضي لإبقاء الملف الحالي" : "",
+            validate: (val) => (!val && oldKind !== "file" ? "اختر الملف." : ""),
+          }
+        );
+      }
+      fields.push(
+        { name: "icon", label: "الأيقونة", type: "icon" },
+        { name: "is_hidden", label: "مخفية عن المفتشين", type: "checkbox" }
+      );
+
+      return formDialog({
+        title: tool ? "تعديل الأداة" : "إضافة أداة",
+        submitText: tool ? "حفظ التعديل" : "إضافة",
+        values: tool
+          ? { name: tool.name, kind: oldKind === "file" ? "file" : "link", url: oldKind === "link" ? tool.url : "", icon_type: tool.icon_type, icon_value: tool.icon_value, is_hidden: tool.is_hidden }
+          : { kind: "link" },
+        fields,
+        onSubmit: async (v) => {
+          let url = tool ? tool.url : "";
+          let oldFileToRemove = null;
+
+          if (!isBuiltin) {
+            if (v.kind === "link") {
+              url = normalizeUrl(v.url);
+              if (oldKind === "file") oldFileToRemove = tool.url;
+            } else if (v.file) {
+              url = await uploadToolFile(v.file);
+              if (oldKind === "file") oldFileToRemove = tool.url;
+            }
+          }
+
+          const icon = await resolveIconValues(v.icon, tool, "tools", TOOL_IMAGES_BUCKET);
+          const values = { name: v.name, url, ...icon, is_hidden: v.is_hidden };
+
+          if (tool) {
+            await updateRow("tools", tool.id, values);
+            Object.assign(tool, values);
+          } else {
+            tools.push(await createRow("tools", { ...values, sort_order: nextSortOrder(tools) }));
+          }
+          if (oldFileToRemove) {
+            await removeStorageFiles(TOOL_FILES_BUCKET, [storagePathFromUrl(oldFileToRemove, TOOL_FILES_BUCKET)]).catch(() => {});
+          }
+        },
+      });
+    }
+
+    (async () => {
+      const profile = await requireAuth({ adminOnly: true });
+      if (!profile) return;
+      renderShell("tools");
+      document.getElementById("crumb").insertAdjacentHTML("afterbegin", svgIcon("chevron", "icon-sm"));
+
+      const box = document.getElementById("box");
+      box.addEventListener("click", async (e) => {
+        const btn = e.target.closest("button[data-act]");
+        if (!btn) return;
+        const i = Number(btn.dataset.i);
+        const act = btn.dataset.act;
+        try {
+          if (act === "add" && (await toolForm(null))) { render(); showToast("أُضيفت الأداة"); }
+          if (act === "edit" && (await toolForm(tools[i]))) { render(); showToast("حُفظ التعديل"); }
+          if (act === "up" || act === "down") {
+            tools = await moveRow("tools", tools, i, act === "up" ? -1 : 1);
+            render();
+          }
+          if (act === "delete") {
+            const t = tools[i];
+            const ok = await confirmDialog({ title: `حذف أداة "${t.name}"`, message: toolKind(t) === "file" ? "بينحذف الملف معها." : "", confirmText: "حذف الأداة", danger: true });
+            if (!ok) return;
+            await deleteToolCompletely(t);
+            tools.splice(i, 1);
+            render();
+            showToast("حُذفت الأداة");
+          }
+        } catch (err) {
+          showToast(adminErrorMessage(err));
+        }
+      });
+
+      try {
+        tools = await fetchTools();
+        render();
+      } catch (e) {
+        box.innerHTML = `<div class="empty">تعذر التحميل، تحقق من الاتصال</div>`;
+      }
+    })();
+  </script>
+</body>
+</html>

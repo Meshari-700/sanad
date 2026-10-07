@@ -123,18 +123,18 @@
 
       const box = document.getElementById("content");
       if (!itemId) {
-        box.innerHTML = `<div class="empty"><strong>البند غير موجود</strong>ارجع لقائمة الأنشطة واختر بندًا</div>`;
+        box.innerHTML = `<div class="empty"><strong>البند غير موجود</strong></div>`;
         return;
       }
       try {
         const [item, fav] = await Promise.all([fetchItem(itemId), isFavorite(itemId)]);
         if (!item) {
-          box.innerHTML = `<div class="empty"><strong>البند غير موجود</strong>ربما حُذف. ارجع لقائمة الأنشطة.</div>`;
+          box.innerHTML = `<div class="empty"><strong>البند غير موجود</strong></div>`;
           return;
         }
         render(item, fav, isAdminRole(profile));
       } catch (e) {
-        box.innerHTML = `<div class="empty">تعذر تحميل البند. تحقق من الاتصال وأعد فتح الصفحة.</div>`;
+        box.innerHTML = `<div class="empty">تعذر التحميل، تحقق من الاتصال</div>`;
       }
     })();
   </script>

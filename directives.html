@@ -25,7 +25,6 @@
     <div class="page-head">
       <div>
         <h1 class="page-title">التوجيهات</h1>
-        <p class="page-sub">آخر ما صدر من الإدارة، الأحدث أولًا</p>
       </div>
     </div>
     <div id="list" aria-live="polite">
@@ -52,7 +51,7 @@
       try {
         const [items, readIds] = await Promise.all([fetchDirectives(), fetchMyReadDirectiveIds()]);
         if (!items.length) {
-          list.innerHTML = `<div class="empty"><strong>لا توجد توجيهات حاليًا</strong>أي توجيه جديد يظهر هنا، مع نقطة تنبيه بالشريط السفلي</div>`;
+          list.innerHTML = `<div class="empty"><strong>لا توجد توجيهات</strong></div>`;
           return;
         }
         list.innerHTML = items.map((d) => {
@@ -72,7 +71,7 @@
         const unread = items.filter((d) => !readIds.has(d.id)).map((d) => d.id);
         if (unread.length) await markDirectivesRead(unread);
       } catch (e) {
-        list.innerHTML = `<div class="empty">تعذر تحميل التوجيهات. تحقق من الاتصال وأعد فتح الصفحة.</div>`;
+        list.innerHTML = `<div class="empty">تعذر التحميل، تحقق من الاتصال</div>`;
       }
     })();
   </script>

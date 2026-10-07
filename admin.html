@@ -24,7 +24,6 @@
   <main class="page">
     <a class="breadcrumb" href="settings.html" id="crumb">الإعدادات</a>
     <h1 class="page-title">لوحة الإشراف</h1>
-    <p class="page-sub" style="margin-bottom:20px">أي تعديل هنا يظهر للمفتشين مباشرة</p>
 
     <div class="card list-card">
       <a class="list-row" href="admin-activities.html" id="lnkActivities">
@@ -32,6 +31,9 @@
       </a>
       <a class="list-row" href="admin-directives.html" id="lnkDirectives">
         <span class="grow"><span class="row-title" style="display:block">التوجيهات</span><span class="row-sub" style="display:block">نشر التوجيهات ومتابعة من قرأها</span></span>
+      </a>
+      <a class="list-row" href="admin-tools.html" id="lnkTools">
+        <span class="grow"><span class="row-title" style="display:block">الأدوات</span><span class="row-sub" style="display:block">الروابط والملفات</span></span>
       </a>
       <a class="list-row hidden" href="users.html" id="lnkUsers">
         <span class="grow"><span class="row-title" style="display:block">المستخدمون</span><span class="row-sub" style="display:block">الأدوار وتعطيل الحسابات</span></span>
@@ -52,7 +54,7 @@
       if (!profile) return;
       renderShell("settings");
       document.getElementById("crumb").insertAdjacentHTML("afterbegin", svgIcon("chevron", "icon-sm"));
-      [["lnkActivities", "grid"], ["lnkDirectives", "megaphone"], ["lnkUsers", "users"]].forEach(([id, icon]) => {
+      [["lnkActivities", "grid"], ["lnkDirectives", "megaphone"], ["lnkTools", "tool"], ["lnkUsers", "users"]].forEach(([id, icon]) => {
         const el = document.getElementById(id);
         el.insertAdjacentHTML("afterbegin", svgIcon(icon));
         el.insertAdjacentHTML("beforeend", svgIcon("chevron", "icon-sm chev"));

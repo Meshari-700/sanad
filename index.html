@@ -79,7 +79,7 @@
       const ids = pruneRecentActivities(allActivities.map((a) => a.id));
       const list = ids.map((id) => byId.get(id)).filter(Boolean);
       if (!list.length) {
-        box.innerHTML = `<div class="empty"><strong>لا توجد أنشطة مفتوحة بعد</strong>أي نشاط تفتحه يظهر هنا للوصول السريع</div>`;
+        box.innerHTML = `<div class="empty"><strong>لا توجد أنشطة مفتوحة</strong></div>`;
         return;
       }
       box.innerHTML = `<div class="tile-grid">${list.map(activityTileHtml).join("")}</div>`;
@@ -93,12 +93,12 @@
         const more = favs.length > FAV_PREVIEW;
         head.innerHTML = sectionHead("star", "المفضلة", more ? `<a class="section-link" href="favorites.html">عرض الكل</a>` : "");
         if (!favs.length) {
-          box.innerHTML = `<div class="empty"><strong>لا توجد بنود في المفضلة</strong>اضغط النجمة داخل أي بند لحفظه هنا</div>`;
+          box.innerHTML = `<div class="empty"><strong>لا توجد بنود في المفضلة</strong></div>`;
           return;
         }
         box.innerHTML = `<div class="card list-card">${favs.slice(0, FAV_PREVIEW).map(favoriteRowHtml).join("")}</div>`;
       } catch (e) {
-        box.innerHTML = `<div class="empty">تعذر تحميل المفضلة. تحقق من الاتصال وأعد فتح الصفحة.</div>`;
+        box.innerHTML = `<div class="empty">تعذر التحميل، تحقق من الاتصال</div>`;
       }
     }
 
@@ -131,7 +131,7 @@
       results.innerHTML = matches.length
         ? `<div class="section-head"><h2 class="section-title">النتائج</h2><span class="section-count">${matches.length}</span></div>
            <div class="tile-grid">${matches.map(activityTileHtml).join("")}</div>`
-        : `<div class="empty"><strong>لا يوجد نشاط بهذا الاسم</strong>جرّب كلمة أقصر، أو تصفح كل الأنشطة</div>`;
+        : `<div class="empty"><strong>لا توجد نتائج</strong></div>`;
     }
 
     (async () => {
@@ -152,7 +152,7 @@
         allActivities = await fetchActivities();
         renderRecent();
       } catch (e) {
-        document.getElementById("recentBox").innerHTML = `<div class="empty">تعذر تحميل الأنشطة. تحقق من الاتصال وأعد فتح الصفحة.</div>`;
+        document.getElementById("recentBox").innerHTML = `<div class="empty">تعذر التحميل، تحقق من الاتصال</div>`;
       }
     })();
   </script>

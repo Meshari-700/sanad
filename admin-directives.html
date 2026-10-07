@@ -26,7 +26,6 @@
     <div class="page-head">
       <div>
         <h1 class="page-title">التوجيهات</h1>
-        <p class="page-sub">التوجيه الجديد يظهر للمفتشين مع نقطة تنبيه</p>
       </div>
       <button class="icon-btn round primary" id="addBtn" aria-label="نشر توجيه جديد"></button>
     </div>
@@ -50,7 +49,7 @@
     function render() {
       const list = document.getElementById("list");
       if (!items.length) {
-        list.innerHTML = `<div class="empty"><strong>لا توجد توجيهات</strong>اضغط + لنشر أول توجيه</div>`;
+        list.innerHTML = `<div class="empty"><strong>لا توجد توجيهات</strong></div>`;
         return;
       }
       list.innerHTML = items.map((d, i) => `
@@ -109,7 +108,7 @@
         try {
           if (btn.dataset.act === "edit" && (await directiveForm(d))) { render(); showToast("حُفظ التعديل"); }
           if (btn.dataset.act === "delete") {
-            const ok = await confirmDialog({ title: "حذف التوجيه", message: `"${d.title}" بينحذف ويختفي من عند كل المفتشين.`, confirmText: "حذف التوجيه", danger: true });
+            const ok = await confirmDialog({ title: "حذف التوجيه", message: "بيختفي من عند الكل.", confirmText: "حذف التوجيه", danger: true });
             if (!ok) return;
             await deleteRow("directives", d.id);
             items = items.filter((x) => x.id !== d.id);
@@ -125,7 +124,7 @@
         [items, activeUsers] = await Promise.all([fetchDirectivesWithReads(), countActiveUsers()]);
         render();
       } catch (e) {
-        document.getElementById("list").innerHTML = `<div class="empty">تعذر تحميل التوجيهات. تحقق من الاتصال وأعد فتح الصفحة.</div>`;
+        document.getElementById("list").innerHTML = `<div class="empty">تعذر التحميل، تحقق من الاتصال</div>`;
       }
     })();
   </script>

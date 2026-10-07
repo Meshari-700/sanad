@@ -82,7 +82,7 @@
       const searching = !!query.trim();
 
       if (!requirements.length) {
-        list.innerHTML = `<div class="empty"><strong>لا توجد اشتراطات لهذا النشاط بعد</strong>تظهر هنا بعد ما يضيفها المشرف</div>`;
+        list.innerHTML = `<div class="empty"><strong>لا توجد اشتراطات</strong></div>`;
         return;
       }
 
@@ -97,7 +97,7 @@
         .filter((b) => b.show);
 
       if (!blocks.length) {
-        list.innerHTML = `<div class="empty"><strong>لا توجد نتائج</strong>جرّب كلمة أقصر، أو امسح البحث لعرض كل الاشتراطات</div>`;
+        list.innerHTML = `<div class="empty"><strong>لا توجد نتائج</strong></div>`;
         return;
       }
 
@@ -159,7 +159,7 @@
         const [activity, reqs] = await Promise.all([fetchActivity(activityId), fetchRequirementsWithItems(activityId)]);
         if (!activity) {
           document.getElementById("hero").innerHTML = `<h1 class="hero-name">النشاط غير موجود</h1>`;
-          list.innerHTML = `<div class="empty">ربما حُذف هذا النشاط. ارجع لقائمة الأنشطة.</div>`;
+          list.innerHTML = `<div class="empty">النشاط غير موجود</div>`;
           return;
         }
 
@@ -175,7 +175,7 @@
         if (reqs[0]) openIds.add(reqs[0].id); // أول اشتراط مفتوح افتراضيًا
         render(input.value);
       } catch (e) {
-        list.innerHTML = `<div class="empty">تعذر تحميل الاشتراطات. تحقق من الاتصال وأعد فتح الصفحة.</div>`;
+        list.innerHTML = `<div class="empty">تعذر التحميل، تحقق من الاتصال</div>`;
       }
     })();
   </script>

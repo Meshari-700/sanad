@@ -56,7 +56,7 @@
       const visible = users.filter((u) => matchesQuery(query, u.full_name, u.email));
       const list = document.getElementById("list");
       if (!visible.length) {
-        list.innerHTML = `<div class="empty">لا يوجد مستخدم بهذا الاسم أو البريد</div>`;
+        list.innerHTML = `<div class="empty">لا توجد نتائج</div>`;
         return;
       }
       list.innerHTML = `<div class="card list-card">${visible.map((u) => {
@@ -101,7 +101,7 @@
         if (newRole === "owner") {
           const ok = await confirmDialog({
             title: "تعيين مالك",
-            message: `${u.full_name || u.email} بيصير عنده نفس صلاحياتك كاملة، ومنها تغيير الأدوار وتعطيل الحسابات.`,
+            message: "بياخذ نفس صلاحياتك.",
             confirmText: "تعيين مالك",
             danger: true,
           });
@@ -129,7 +129,7 @@
         if (disable) {
           const ok = await confirmDialog({
             title: "تعطيل الحساب",
-            message: `${u.full_name || u.email} ما بيقدر يستخدم سند لين تعيد تفعيله.`,
+            message: "ما بيقدر يدخل لين تفعّله.",
             confirmText: "تعطيل الحساب",
             danger: true,
           });
@@ -151,7 +151,7 @@
         users = await fetchAllProfiles();
         render();
       } catch (err) {
-        list.innerHTML = `<div class="empty">تعذر تحميل المستخدمين. تحقق من الاتصال وأعد فتح الصفحة.</div>`;
+        list.innerHTML = `<div class="empty">تعذر التحميل، تحقق من الاتصال</div>`;
       }
     })();
   </script>

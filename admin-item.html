@@ -44,10 +44,8 @@
       <div class="field">
         <label for="notes">ملاحظات</label>
         <textarea id="notes" rows="3" maxlength="3000"></textarea>
-        <div class="field-hint">تظهر للمفتش في بطاقة "ملاحظات" داخل البند. اتركها فاضية لو ما فيه ملاحظات.</div>
       </div>
       <label class="check-row"><input type="checkbox" id="suspended" /><span>البند موقوف</span></label>
-      <div class="field-hint" style="margin:-10px 0 16px">يبقى ظاهرًا للمفتش لكن بشكل باهت مع وسم "موقوف".</div>
 
       <p class="msg" id="msg" role="alert"></p>
       <button class="btn block" id="saveBtn">حفظ</button>
@@ -58,7 +56,7 @@
       <div class="photo-edit" id="photoGrid"></div>
       <input type="file" id="photoInput" accept="image/*" multiple class="hidden" />
     </section>
-    <div class="empty hidden" id="photosLater" style="margin-top:16px">احفظ البند أولًا، وبعدها تقدر تضيف حتى 3 صور.</div>
+    <div class="empty hidden" id="photosLater" style="margin-top:16px">الصور تنضاف بعد حفظ البند</div>
 
     <button class="btn block danger hidden" id="deleteBtn" style="margin-top:24px">حذف البند</button>
   </main>
@@ -112,7 +110,7 @@
       const del = e.target.closest("[data-del]");
       if (!del) return;
       const img = images[Number(del.dataset.del)];
-      const ok = await confirmDialog({ title: "حذف الصورة", message: "بتنحذف الصورة نهائيًا من البند.", confirmText: "حذف الصورة", danger: true });
+      const ok = await confirmDialog({ title: "حذف الصورة", message: "", confirmText: "حذف الصورة", danger: true });
       if (!ok) return;
       try {
         await deleteItemImage(img);
@@ -175,7 +173,7 @@
     async function remove() {
       const ok = await confirmDialog({
         title: "حذف البند",
-        message: `"${item.title}" بينحذف مع صوره، ولا يمكن التراجع.`,
+        message: "بينحذف مع صوره.",
         confirmText: "حذف البند",
         danger: true,
       });
@@ -219,7 +217,7 @@
           $("viewBtn").href = `item.html?id=${encodeURIComponent(item.id)}`;
           $("viewBtn").innerHTML = svgIcon("book");
           $("viewBtn").classList.remove("hidden");
-          if (getParam("created")) showToast("أُضيف البند. تقدر الحين تضيف صوره.");
+          if (getParam("created")) showToast("أُضيف البند");
         } else if (newForRequirement) {
           const { data: req, error } = await supabaseClient
             .from("requirements")
@@ -238,7 +236,7 @@
           $("pageTitle").textContent = "البند غير موجود";
         }
       } catch (e) {
-        showMsg("تعذر تحميل البند. تحقق من الاتصال وأعد فتح الصفحة.");
+        showMsg("تعذر التحميل، تحقق من الاتصال");
       }
     })();
   </script>

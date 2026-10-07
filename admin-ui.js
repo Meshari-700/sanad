@@ -57,6 +57,10 @@ function formDialog({ title, fields, values = {}, submitText = "حفظ", onSubmi
             </div>
           </div>`;
         }
+        case "file":
+          return `<div class="field"><label for="${id}">${escapeHtml(f.label)}</label>
+            <input id="${id}" type="file" name="${f.name}" ${f.accept ? `accept="${escapeHtml(f.accept)}"` : ""} />
+            ${f.hint ? `<div class="field-hint">${escapeHtml(f.hint)}</div>` : ""}</div>`;
         default:
           return `<div class="field"><label for="${id}">${escapeHtml(f.label)}</label>
             <input id="${id}" type="text" name="${f.name}" value="${escapeHtml(v ?? "")}" ${f.maxlength ? `maxlength="${f.maxlength}"` : ""} placeholder="${escapeHtml(f.placeholder || "")}" />
@@ -67,7 +71,9 @@ function formDialog({ title, fields, values = {}, submitText = "حفظ", onSubmi
     overlay.innerHTML = `
       <div class="modal-box" role="dialog" aria-modal="true">
         <h3>${escapeHtml(title)}</h3>
-        <div style="margin-top:14px">${fields.map(fieldHtml).join("")}</div>
+        <div style="margin-top:14px">${fields.map((f, i) =>
+          `<div data-wrap="${f.name}" ${f.showIf ? `data-show-if="${f.showIf.field}" data-show-val="${escapeHtml(f.showIf.value)}"` : ""}>${fieldHtml(f, i)}</div>`
+        ).join("")}</div>
         <p class="msg error" data-msg></p>
         <div class="modal-actions">
           <button class="btn" data-ok>${escapeHtml(submitText)}</button>
@@ -78,6 +84,16 @@ function formDialog({ title, fields, values = {}, submitText = "حفظ", onSubmi
     const box = overlay.querySelector(".modal-box");
     const msg = overlay.querySelector("[data-msg]");
     const ok = overlay.querySelector("[data-ok]");
+
+    // إظهار/إخفاء الحقول المشروطة (showIf: { field, value })
+    function applyShowIf() {
+      box.querySelectorAll("[data-show-if]").forEach((w) => {
+        const ctrl = box.querySelector(`[name="${w.dataset.showIf}"]`);
+        w.classList.toggle("hidden", !ctrl || ctrl.value !== w.dataset.showVal);
+      });
+    }
+    box.querySelectorAll("select").forEach((sel) => sel.addEventListener("change", applyShowIf));
+    applyShowIf();
 
     // تبديل الإيموجي/الصورة + معاينة الصورة المختارة
     const iconField = box.querySelector("[data-icon-field]");
@@ -105,6 +121,8 @@ function formDialog({ title, fields, values = {}, submitText = "حفظ", onSubmi
       for (const f of fields) {
         if (f.type === "checkbox") {
           out[f.name] = box.querySelector(`[name="${f.name}"]`).checked;
+        } else if (f.type === "file") {
+          out[f.name] = box.querySelector(`[name="${f.name}"]`).files[0] || null;
         } else if (f.type === "icon") {
           const type = box.querySelector('input[name="icon_type"]:checked').value;
           out[f.name] = {
@@ -122,6 +140,11 @@ function formDialog({ title, fields, values = {}, submitText = "حفظ", onSubmi
 
     function validate(v) {
       for (const f of fields) {
+        if (box.querySelector(`[data-wrap="${f.name}"]`).classList.contains("hidden")) continue;
+        if (typeof f.validate === "function") {
+          const err = f.validate(v[f.name], v);
+          if (err) return err;
+        }
         if (f.required && f.type !== "checkbox" && f.type !== "icon" && !v[f.name]) return `اكتب ${f.label}.`;
         if (f.type === "icon" && v[f.name].icon_type === "upload" && !v[f.name].icon_file && values.icon_type !== "upload") {
           return "اختر صورة للأيقونة، أو بدّل إلى إيموجي.";

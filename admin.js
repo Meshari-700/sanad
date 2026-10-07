@@ -69,36 +69,36 @@ async function removeStorageFiles(bucket, paths) {
 }
 
 // أيقونة مجموعة/نشاط: تُصغّر لـ 256 وترجع رابط عام
-async function uploadIcon(file, folder) {
+async function uploadIcon(file, folder, bucket = ICONS_BUCKET) {
   const small = await compressImage(file, 256, 0.85);
   const path = `${folder}/${newFileName()}`;
-  const { error } = await supabaseClient.storage.from(ICONS_BUCKET).upload(path, small, { contentType: "image/jpeg" });
+  const { error } = await supabaseClient.storage.from(bucket).upload(path, small, { contentType: "image/jpeg" });
   if (error) throw error;
-  return publicFileUrl(ICONS_BUCKET, path);
+  return publicFileUrl(bucket, path);
 }
 
-async function removeIconByUrl(url) {
-  const path = storagePathFromUrl(url, ICONS_BUCKET);
+async function removeIconByUrl(url, bucket = ICONS_BUCKET) {
+  const path = storagePathFromUrl(url, bucket);
   if (path) {
-    try { await removeStorageFiles(ICONS_BUCKET, [path]); } catch (e) { /* ملف يتيم أهون من فشل العملية */ }
+    try { await removeStorageFiles(bucket, [path]); } catch (e) { /* ملف يتيم أهون من فشل العملية */ }
   }
 }
 
 // يجهّز قيم الأيقونة من نتيجة حقل الأيقونة بالنموذج، ويرفع الصورة لو لزم
 // يرجع { icon_type, icon_value } ويحذف الصورة القديمة لو تغيّرت
-async function resolveIconValues(formIcon, oldEntity, folder) {
+async function resolveIconValues(formIcon, oldEntity, folder, bucket = ICONS_BUCKET) {
   const oldUploaded = oldEntity && oldEntity.icon_type === "upload" ? oldEntity.icon_value : null;
 
   if (formIcon.icon_type === "upload") {
     if (formIcon.icon_file) {
-      const url = await uploadIcon(formIcon.icon_file, folder);
-      if (oldUploaded) await removeIconByUrl(oldUploaded);
+      const url = await uploadIcon(formIcon.icon_file, folder, bucket);
+      if (oldUploaded) await removeIconByUrl(oldUploaded, bucket);
       return { icon_type: "upload", icon_value: url };
     }
     return { icon_type: "upload", icon_value: oldUploaded };
   }
 
-  if (oldUploaded) await removeIconByUrl(oldUploaded);
+  if (oldUploaded) await removeIconByUrl(oldUploaded, bucket);
   return { icon_type: "emoji", icon_value: (formIcon.icon_value || "").trim() || null };
 }
 
@@ -161,6 +161,28 @@ async function deleteActivityCompletely(activity) {
 async function deleteGroupCompletely(group) {
   if (group.icon_type === "upload") await removeIconByUrl(group.icon_value);
   await deleteRow("activity_groups", group.id); // أنشطتها تبقى بدون مجموعة
+}
+
+// -------------------------------------------------
+// الأدوات
+// -------------------------------------------------
+// رفع ملف أداة كما هو (بدون ضغط) مع الحفاظ على امتداده
+async function uploadToolFile(file) {
+  const ext = (file.name.match(/\.[a-z0-9]{1,8}$/i) || [""])[0].toLowerCase();
+  const path = newFileName().replace(".jpg", ext);
+  const { error } = await supabaseClient.storage
+    .from(TOOL_FILES_BUCKET)
+    .upload(path, file, { contentType: file.type || "application/octet-stream" });
+  if (error) throw error;
+  return publicFileUrl(TOOL_FILES_BUCKET, path);
+}
+
+async function deleteToolCompletely(tool) {
+  if (toolKind(tool) === "file") {
+    await removeStorageFiles(TOOL_FILES_BUCKET, [storagePathFromUrl(tool.url, TOOL_FILES_BUCKET)]);
+  }
+  if (tool.icon_type === "upload") await removeIconByUrl(tool.icon_value, TOOL_IMAGES_BUCKET);
+  await deleteRow("tools", tool.id);
 }
 
 // -------------------------------------------------

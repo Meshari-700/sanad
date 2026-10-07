@@ -78,7 +78,7 @@
         <button class="btn block secondary" id="addReqBtn">${svgIcon("plus", "icon-sm")}إضافة اشتراط</button>`;
 
       if (!requirements.length) {
-        box.insertAdjacentHTML("afterbegin", `<div class="empty" style="margin-bottom:14px"><strong>لا توجد اشتراطات بعد</strong>ابدأ بإضافة أول اشتراط، ثم أضف بنوده</div>`);
+        box.insertAdjacentHTML("afterbegin", `<div class="empty" style="margin-bottom:14px"><strong>لا توجد اشتراطات</strong></div>`);
       }
     }
 
@@ -125,7 +125,7 @@
           if (act === "delete") {
             const ok = await confirmDialog({
               title: `حذف اشتراط "${req.name}"`,
-              message: `بينحذف مع بنوده (${req.items.length}) وصورها، ولا يمكن التراجع.`,
+              message: "بينحذف مع بنوده.",
               confirmText: "حذف الاشتراط",
               danger: true,
               typedWord: req.items.length ? "حذف" : null,
@@ -145,7 +145,7 @@
             const it = req.items[i];
             const ok = await confirmDialog({
               title: "حذف البند",
-              message: `"${it.title}" بينحذف مع صوره، ولا يمكن التراجع.`,
+              message: "بينحذف مع صوره.",
               confirmText: "حذف البند",
               danger: true,
             });
@@ -168,7 +168,7 @@
       document.getElementById("crumb").insertAdjacentHTML("afterbegin", svgIcon("chevron", "icon-sm"));
 
       const box = document.getElementById("reqBox");
-      if (!activityId) { box.innerHTML = `<div class="empty">النشاط غير موجود.</div>`; return; }
+      if (!activityId) { box.innerHTML = `<div class="empty">النشاط غير موجود</div>`; return; }
 
       const viewBtn = document.getElementById("viewBtn");
       viewBtn.href = `activity.html?id=${encodeURIComponent(activityId)}`;
@@ -177,13 +177,13 @@
       box.addEventListener("click", onClick);
       try {
         const [activity, reqs] = await Promise.all([fetchActivity(activityId), fetchRequirementsWithItems(activityId)]);
-        if (!activity) { box.innerHTML = `<div class="empty">ربما حُذف هذا النشاط. ارجع لقائمة الأنشطة.</div>`; return; }
+        if (!activity) { box.innerHTML = `<div class="empty">النشاط غير موجود</div>`; return; }
         document.getElementById("actName").textContent = activity.name;
         document.title = `${activity.name} — إدارة — سند`;
         requirements = reqs;
         render();
       } catch (e) {
-        box.innerHTML = `<div class="empty">تعذر تحميل البيانات. تحقق من الاتصال وأعد فتح الصفحة.</div>`;
+        box.innerHTML = `<div class="empty">تعذر التحميل، تحقق من الاتصال</div>`;
       }
     })();
   </script>
