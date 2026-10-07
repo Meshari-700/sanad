@@ -28,7 +28,7 @@ const PRODUCTS_PER_PAGE = 5;
 const TPL_SEIZURE = {
   key: "seizure",
   title: "إشعار ضبط وإتلاف",
-  image: "templates/seizure.jpg",
+  image: "seizure.jpg",
   shopKey: "shop_name",
 
   sections: [
@@ -220,7 +220,7 @@ const GENERAL_ITEMS = [
 const TPL_CASE_GENERAL = {
   key: "case_general",
   title: "محضر إثبات حالة (عام)",
-  image: "templates/case-general.jpg",
+  image: "case-general.jpg",
   shopKey: "shop_name",
   sections: [
     CASE_COMMON_TOP,
@@ -258,7 +258,7 @@ const CARDS_ITEMS = [
 const TPL_CASE_CARDS = {
   key: "case_cards",
   title: "محضر إثبات حالة (كروت صحية)",
-  image: "templates/case-cards.jpg",
+  image: "case-cards.jpg",
   shopKey: "shop_name",
   sections: [
     CASE_COMMON_TOP,
