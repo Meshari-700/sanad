@@ -301,7 +301,9 @@
         $("saveBtn").addEventListener("click", save);
         $("backBtn").addEventListener("click", hideSheet);
       } catch (e) {
-        $("formMsg").textContent = "تعذر تجهيز المعاينة. أعد المحاولة.";
+        $("formMsg").textContent = /صورة القالب/.test(e.message || "")
+          ? "تعذر تحميل صورة القالب. تأكد إن ملف " + tpl.image + " مرفوع جنب باقي الملفات."
+          : "تعذر تجهيز المعاينة (" + (e.message || "خطأ غير معروف") + ")";
       } finally {
         $("previewBtn").disabled = false;
         $("previewBtn").textContent = "معاينة المحضر";
