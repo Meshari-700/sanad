@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#126151" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="سند" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="apple-touch-icon" href="icon-180.png" />
+  <link rel="icon" href="icon.png" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://cttooytoziipdcasliah.supabase.co" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <title>المحاضر — سند</title>
+</head>
+<body>
+  <header id="appHeader"></header>
+
+  <main class="page">
+    <a class="breadcrumb" href="tools.html" id="crumb">الأدوات</a>
+    <h1 class="page-title" style="margin-bottom:18px">المحاضر</h1>
+
+    <section>
+      <div class="section-head"><span id="hNew"></span><h2 class="section-title">محضر جديد</h2></div>
+      <div class="card list-card" id="templates"></div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span id="hList"></span><h2 class="section-title" id="listTitle">محاضري</h2><span class="spacer"></span><span class="chip" id="count"></span></div>
+
+      <label class="search">
+        <span id="searchIcon"></span>
+        <input id="searchInput" type="search" placeholder="ابحث باسم المنشأة..." autocomplete="off" aria-label="ابحث باسم المنشأة" />
+      </label>
+      <div class="filter-row hidden" id="filters">
+        <select id="fUser" aria-label="المفتش"><option value="">كل المفتشين</option></select>
+        <select id="fType" aria-label="نوع المحضر"><option value="">كل الأنواع</option></select>
+      </div>
+
+      <div id="list"><div class="card skeleton" style="height:160px"></div></div>
+    </section>
+  </main>
+
+  <nav id="bottomNav"></nav>
+
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="utils.js"></script>
+  <script src="directives.js"></script>
+  <script src="layout.js"></script>
+  <script src="report-templates.js"></script>
+  <script src="reports.js"></script>
+  <script>
+    let profile = null;
+    let isAdmin = false;
+    let reports = [];
+    const $ = (id) => document.getElementById(id);
+
+    function authorName(r) {
+      return (r.author && (r.author.full_name || r.author.email)) || "";
+    }
+
+    function render() {
+      const q = $("searchInput").value;
+      const fu = $("fUser").value;
+      const ft = $("fType").value;
+      const visible = reports.filter((r) =>
+        matchesQuery(q, r.shop_name) && (!fu || r.created_by === fu) && (!ft || r.template_key === ft)
+      );
+      $("count").textContent = `${visible.length}`;
+      const list = $("list");
+      if (!reports.length) {
+        list.innerHTML = `<div class="empty"><strong>لا توجد محاضر</strong></div>`;
+        return;
+      }
+      if (!visible.length) {
+        list.innerHTML = `<div class="empty"><strong>لا توجد نتائج</strong></div>`;
+        return;
+      }
+      list.innerHTML = `<div class="card list-card">${visible.map((r) => {
+        const tpl = getReportTemplate(r.template_key);
+        const sub = [formatDate(r.created_at), tpl ? tpl.title : ""];
+        if (isAdmin && r.created_by !== profile.id) sub.push(authorName(r));
+        return `
+          <button class="list-row" data-id="${r.id}">
+            ${svgIcon("doc")}
+            <span class="grow">
+              <span class="row-title" style="display:block">${escapeHtml(r.shop_name || "بدون اسم منشأة")}</span>
+              <span class="row-sub" style="display:block">${escapeHtml(sub.filter(Boolean).join("، "))}</span>
+            </span>
+            ${svgIcon("chevron", "icon-sm chev")}
+          </button>`;
+      }).join("")}</div>`;
+    }
+
+    // نافذة المحضر: الملف يُجلب مسبقًا عشان المشاركة تشتغل بضغطة وحدة
+    async function openReport(r) {
+      const tpl = getReportTemplate(r.template_key);
+      const overlay = document.createElement("div");
+      overlay.className = "modal-overlay";
+      overlay.innerHTML = `
+        <div class="modal-box" role="dialog" aria-modal="true">
+          <h3></h3>
+          <p></p>
+          <div class="sheet-actions" style="margin-top:0">
+            <a class="btn block" data-view target="_blank" rel="noopener" aria-disabled="true">عرض المحضر</a>
+            <button class="btn secondary block" data-share disabled>جارٍ تجهيز الملف...</button>
+            ${isAdmin ? `<button class="btn secondary block" data-delete style="color:var(--danger)">حذف المحضر</button>` : ""}
+            <button class="btn secondary block" data-close>إغلاق</button>
+          </div>
+        </div>`;
+      overlay.querySelector("h3").textContent = r.shop_name || "بدون اسم منشأة";
+      overlay.querySelector("p").textContent = `${tpl ? tpl.title : ""}، ${formatDate(r.created_at)}${isAdmin ? "، " + authorName(r) : ""}`;
+      document.body.appendChild(overlay);
+
+      const close = () => overlay.remove();
+      overlay.querySelector("[data-close]").addEventListener("click", close);
+      overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+
+      const view = overlay.querySelector("[data-view]");
+      const share = overlay.querySelector("[data-share]");
+      let blob = null;
+
+      try {
+        const url = await reportSignedUrl(r.pdf_path);
+        view.href = url;
+        view.removeAttribute("aria-disabled");
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("download failed");
+        blob = await res.blob();
+        share.disabled = false;
+        share.innerHTML = `${svgIcon("share", "icon-sm")}مشاركة PDF`;
+      } catch (e) {
+        share.textContent = "تعذر تحميل الملف";
+      }
+
+      share.addEventListener("click", () => {
+        if (blob) shareOrDownload(blob, reportFileName(tpl || { title: "محضر", shopKey: "shop_name" }, { shop_name: r.shop_name }));
+      });
+
+      const del = overlay.querySelector("[data-delete]");
+      if (del) {
+        del.addEventListener("click", async () => {
+          close();
+          const ok = await confirmDialog({ title: "حذف المحضر", message: "بينحذف المحضر وملفه نهائيًا.", confirmText: "حذف المحضر", danger: true, typedWord: "حذف" });
+          if (!ok) return;
+          try {
+            await deleteReport(r);
+            reports = reports.filter((x) => x.id !== r.id);
+            render();
+            showToast("حُذف المحضر");
+          } catch (err) {
+            showToast("تعذر حذف المحضر");
+          }
+        });
+      }
+    }
+
+    (async () => {
+      profile = await requireAuth();
+      if (!profile) return;
+      isAdmin = isAdminRole(profile);
+      renderShell("tools");
+      $("crumb").insertAdjacentHTML("afterbegin", svgIcon("chevron", "icon-sm"));
+      $("hNew").outerHTML = svgIcon("plus");
+      $("hList").outerHTML = svgIcon("doc");
+      $("searchIcon").outerHTML = svgIcon("search");
+
+      $("templates").innerHTML = REPORT_TEMPLATES.map((t) => `
+        <a class="list-row" href="report-new.html?t=${encodeURIComponent(t.key)}">
+          ${svgIcon("doc")}
+          <span class="grow row-title">${escapeHtml(t.title)}</span>
+          ${svgIcon("chevron", "icon-sm chev")}
+        </a>`).join("");
+
+      if (isAdmin) {
+        $("listTitle").textContent = "كل المحاضر";
+        $("filters").classList.remove("hidden");
+        $("fType").insertAdjacentHTML("beforeend", REPORT_TEMPLATES.map((t) => `<option value="${t.key}">${escapeHtml(t.title)}</option>`).join(""));
+      }
+
+      $("searchInput").addEventListener("input", debounce(render, 150));
+      $("fUser").addEventListener("change", render);
+      $("fType").addEventListener("change", render);
+      $("list").addEventListener("click", (e) => {
+        const row = e.target.closest("[data-id]");
+        if (row) openReport(reports.find((r) => r.id === row.dataset.id));
+      });
+
+      try {
+        reports = await fetchReports();
+        if (isAdmin) {
+          const users = new Map();
+          reports.forEach((r) => users.set(r.created_by, authorName(r) || "بدون اسم"));
+          $("fUser").insertAdjacentHTML("beforeend", [...users].map(([id, name]) => `<option value="${id}">${escapeHtml(name)}</option>`).join(""));
+        }
+        render();
+      } catch (e) {
+        $("list").innerHTML = `<div class="empty">تعذر التحميل، تحقق من الاتصال</div>`;
+      }
+    })();
+  </script>
+</body>
+</html>

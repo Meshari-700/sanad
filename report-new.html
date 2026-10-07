@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#126151" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="سند" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="apple-touch-icon" href="icon-180.png" />
+  <link rel="icon" href="icon.png" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://cttooytoziipdcasliah.supabase.co" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <title>محضر جديد — سند</title>
+</head>
+<body>
+  <header id="appHeader"></header>
+
+  <main class="page">
+    <a class="breadcrumb" href="tool-reports.html" id="crumb">المحاضر</a>
+    <h1 class="page-title" id="pageTitle" style="margin-bottom:18px">…</h1>
+
+    <div id="form"></div>
+
+    <p class="msg error" id="formMsg" role="alert" style="margin-top:14px"></p>
+    <div class="sticky-actions">
+      <button class="btn block" id="previewBtn">معاينة المحضر</button>
+    </div>
+  </main>
+
+  <!-- المعاينة ثم نتيجة الحفظ -->
+  <div class="sheet hidden" id="sheet">
+    <div class="sheet-inner" id="sheetInner"></div>
+  </div>
+
+  <nav id="bottomNav"></nav>
+
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="utils.js"></script>
+  <script src="directives.js"></script>
+  <script src="layout.js"></script>
+  <script src="report-templates.js"></script>
+  <script src="reports.js"></script>
+  <script>
+    const tpl = getReportTemplate(getParam("t"));
+    const pads = {};        // لوحات التوقيع حسب المفتاح
+    let profile = null;
+    let dirty = false;
+    let savedBlob = null;
+
+    const $ = (id) => document.getElementById(id);
+
+    // ---------------------------------------------
+    // بناء النموذج من تعريف القالب
+    // ---------------------------------------------
+    function fieldHtml(f) {
+      const id = `f_${f.key}`;
+      switch (f.type) {
+        case "text":
+          return `<div class="field"><label for="${id}">${escapeHtml(f.label)}</label>
+            <input id="${id}" data-key="${f.key}" type="text" ${f.inputmode ? `inputmode="${f.inputmode}"` : ""} maxlength="200" /></div>`;
+        case "date":
+          return `<div class="field"><label for="${id}">${escapeHtml(f.label)}</label>
+            <input id="${id}" data-key="${f.key}" type="date" />
+            ${f.hijriHint ? `<div class="date-hint" data-hijri-for="${f.key}"></div>` : ""}</div>`;
+        case "time":
+          return `<div class="field"><label for="${id}">${escapeHtml(f.label)}</label>
+            <input id="${id}" data-key="${f.key}" type="time" /></div>`;
+        case "textarea":
+          return `<div class="field"><label for="${id}">${escapeHtml(f.label)}</label>
+            <textarea id="${id}" data-key="${f.key}" rows="${f.rows || 4}" maxlength="1500"></textarea></div>`;
+        case "checkbox":
+          return `<label class="check-row"><input type="checkbox" data-key="${f.key}" /><span>${escapeHtml(f.label)}</span></label>`;
+        case "checklist":
+          return `<div data-checklist="${f.key}">${f.items.map((it) => `
+            <div class="check-item">
+              <input type="checkbox" id="ck_${it.id}" data-item="${it.id}" />
+              <label for="ck_${it.id}">${escapeHtml(it.label)}</label>
+              ${f.withCount && it.count ? `<input class="count-input" type="number" inputmode="numeric" min="1" max="999" placeholder="العدد" data-count="${it.id}" disabled aria-label="العدد" />` : ""}
+            </div>`).join("")}</div>`;
+        case "products":
+          return `<div data-products="${f.key}"></div>
+            <button type="button" class="btn secondary block" data-add-product="${f.key}">${svgIcon("plus", "icon-sm")}إضافة منتج</button>`;
+        case "signature":
+          return `<div class="field" data-sig-wrap="${f.key}">
+            <label>${escapeHtml(f.label)}</label>
+            <div class="sig-box"><canvas data-sig="${f.key}"></canvas><span class="sig-placeholder">وقّع هنا</span></div>
+            <div class="sig-actions"><button type="button" class="link-btn" data-sig-clear="${f.key}">مسح التوقيع</button></div>
+          </div>`;
+        default:
+          return "";
+      }
+    }
+
+    function productBlockHtml(f, index) {
+      return `<div class="product-block" data-product-index="${index}">
+        <div class="product-head"><span>منتج ${index + 1}</span>
+          <button type="button" class="mini-btn danger" data-remove-product aria-label="حذف المنتج">${svgIcon("trash")}</button></div>
+        <div class="field-row">
+          ${f.columns.map((c) => `<div class="field"><label>${escapeHtml(c.label)}</label>
+            <input type="text" data-col="${c.key}" ${c.inputmode ? `inputmode="${c.inputmode}"` : ""} maxlength="80" /></div>`).join("")}
+        </div>
+      </div>`;
+    }
+
+    function renumberProducts(container) {
+      container.querySelectorAll(".product-block").forEach((b, i) => {
+        b.dataset.productIndex = i;
+        b.querySelector(".product-head span").textContent = `منتج ${i + 1}`;
+      });
+    }
+
+    function buildForm() {
+      const form = $("form");
+      form.innerHTML = tpl.sections.map((sec) => `
+        <section class="card form-section">
+          <div class="card-head">${escapeHtml(sec.title)}</div>
+          ${sec.note ? `<p class="section-note">${escapeHtml(sec.note)}</p>` : ""}
+          ${sec.fields.map(fieldHtml).join("")}
+        </section>`).join("");
+
+      const allFields = tpl.sections.flatMap((s) => s.fields);
+
+      // القيم الافتراضية
+      for (const f of allFields) {
+        const el = form.querySelector(`[data-key="${f.key}"]`);
+        if (f.defaultToday && el) el.value = todayISO();
+        if (f.defaultNow && el) el.value = nowHHMM();
+        if (f.fromProfile && el) el.value = profile.full_name || "";
+        if (f.type === "products") addProduct(f);
+      }
+      updateHijriHints();
+
+      // لوحات التوقيع
+      form.querySelectorAll("[data-sig]").forEach((c) => {
+        const key = c.dataset.sig;
+        const placeholder = c.parentElement.querySelector(".sig-placeholder");
+        pads[key] = createSignaturePad(c, (isEmpty) => {
+          placeholder.classList.toggle("hidden", !isEmpty);
+          dirty = true;
+        });
+      });
+
+      // إخفاء توقيع صاحب المنشأة عند "رفض التوقيع"
+      for (const f of allFields.filter((x) => x.hiddenWhen)) {
+        const toggle = form.querySelector(`[data-key="${f.hiddenWhen}"]`);
+        const wrap = form.querySelector(`[data-sig-wrap="${f.key}"]`);
+        const apply = () => {
+          wrap.classList.toggle("hidden", toggle.checked);
+          if (!toggle.checked) pads[f.key].refresh();
+        };
+        toggle.addEventListener("change", apply);
+      }
+
+      form.addEventListener("input", (e) => {
+        dirty = true;
+        if (e.target.type === "date") updateHijriHints();
+      });
+
+      form.addEventListener("change", (e) => {
+        const item = e.target.dataset.item;
+        if (item) {
+          const count = form.querySelector(`[data-count="${item}"]`);
+          if (count) {
+            count.disabled = !e.target.checked;
+            if (e.target.checked) count.focus();
+          }
+        }
+      });
+
+      form.addEventListener("click", (e) => {
+        const add = e.target.closest("[data-add-product]");
+        if (add) {
+          addProduct(allFields.find((x) => x.key === add.dataset.addProduct), true);
+          return;
+        }
+        const rm = e.target.closest("[data-remove-product]");
+        if (rm) {
+          const container = rm.closest("[data-products]");
+          rm.closest(".product-block").remove();
+          if (!container.children.length) addProduct(allFields.find((x) => x.key === container.dataset.products));
+          renumberProducts(container);
+          return;
+        }
+        const clr = e.target.closest("[data-sig-clear]");
+        if (clr) pads[clr.dataset.sigClear].clear();
+      });
+    }
+
+    function addProduct(f, focus = false) {
+      const container = $("form").querySelector(`[data-products="${f.key}"]`);
+      container.insertAdjacentHTML("beforeend", productBlockHtml(f, container.children.length));
+      if (focus) container.lastElementChild.querySelector("input").focus();
+    }
+
+    function updateHijriHints() {
+      $("form").querySelectorAll("[data-hijri-for]").forEach((el) => {
+        const v = $("form").querySelector(`[data-key="${el.dataset.hijriFor}"]`).value;
+        const h = hijriParts(v);
+        el.textContent = h ? `يوافق ${h.year}/${h.month}/${h.day} هـ` : "";
+      });
+    }
+
+    // ---------------------------------------------
+    // جمع البيانات والتحقق
+    // ---------------------------------------------
+    function collect() {
+      const form = $("form");
+      const data = {};
+      const allFields = tpl.sections.flatMap((s) => s.fields);
+      for (const f of allFields) {
+        if (["text", "date", "time", "textarea"].includes(f.type)) {
+          data[f.key] = form.querySelector(`[data-key="${f.key}"]`).value.trim();
+        } else if (f.type === "checkbox") {
+          data[f.key] = form.querySelector(`[data-key="${f.key}"]`).checked;
+        } else if (f.type === "checklist") {
+          const out = {};
+          for (const it of f.items) {
+            const on = form.querySelector(`[data-item="${it.id}"]`).checked;
+            if (!on) continue;
+            if (f.withCount) {
+              const c = form.querySelector(`[data-count="${it.id}"]`);
+              out[it.id] = { on: true, count: c && c.value ? Number(c.value) : null };
+            } else {
+              out[it.id] = true;
+            }
+          }
+          data[f.key] = out;
+        } else if (f.type === "products") {
+          data[f.key] = Array.from(form.querySelectorAll(`[data-products="${f.key}"] .product-block`))
+            .map((b) => Object.fromEntries(Array.from(b.querySelectorAll("[data-col]")).map((i) => [i.dataset.col, i.value.trim()])))
+            .filter((row) => Object.values(row).some(Boolean));
+        }
+      }
+      return data;
+    }
+
+    function collectSignatures(data) {
+      const sigs = {};
+      for (const f of tpl.sections.flatMap((s) => s.fields).filter((x) => x.type === "signature")) {
+        if (f.hiddenWhen && data[f.hiddenWhen]) continue;
+        sigs[f.key] = pads[f.key].toDataURL();
+      }
+      return sigs;
+    }
+
+    function validate(data, sigs) {
+      for (const f of tpl.sections.flatMap((s) => s.fields)) {
+        if (f.type === "signature") {
+          if (f.required && !sigs[f.key]) return `${f.label} مطلوب.`;
+          continue;
+        }
+        if (f.type === "products") {
+          if (!data[f.key].length) return "أضف منتجًا واحدًا على الأقل.";
+          if (data[f.key].some((p) => !p.name)) return "اكتب اسم كل منتج.";
+          continue;
+        }
+        if (f.required && !data[f.key]) return `اكتب ${f.label}.`;
+      }
+      if (tpl.key === "seizure") {
+        const r = data.reasons || {};
+        if (!r.expired && !r.damaged && !r.pests && !data.other_reason) return "حدد سبب الضبط.";
+      } else {
+        if (!Object.keys(data.items || {}).length && !data.extra1 && !data.extra2) return "حدد مخالفة واحدة على الأقل.";
+      }
+      return "";
+    }
+
+    // ---------------------------------------------
+    // المعاينة والحفظ
+    // ---------------------------------------------
+    let current = null; // { data, sigs, pages }
+
+    async function preview() {
+      const data = collect();
+      const sigs = collectSignatures(data);
+      const problem = validate(data, sigs);
+      $("formMsg").textContent = problem;
+      if (problem) return;
+
+      $("previewBtn").disabled = true;
+      $("previewBtn").textContent = "جارٍ تجهيز المعاينة...";
+      try {
+        const pages = await renderReportPages(tpl, data, sigs);
+        current = { data, sigs, pages };
+        showSheet(`
+          <h2>معاينة المحضر</h2>
+          ${pages.map((c) => `<img class="preview-page" src="${c.toDataURL("image/jpeg", 0.8)}" alt="صفحة من المحضر" />`).join("")}
+          <p class="msg error" id="saveMsg" role="alert"></p>
+          <div class="sheet-actions">
+            <button class="btn block" id="saveBtn">حفظ المحضر</button>
+            <button class="btn secondary block" id="backBtn">رجوع للتعديل</button>
+          </div>`);
+        $("saveBtn").addEventListener("click", save);
+        $("backBtn").addEventListener("click", hideSheet);
+      } catch (e) {
+        $("formMsg").textContent = "تعذر تجهيز المعاينة. أعد المحاولة.";
+      } finally {
+        $("previewBtn").disabled = false;
+        $("previewBtn").textContent = "معاينة المحضر";
+      }
+    }
+
+    async function save() {
+      const btn = $("saveBtn");
+      btn.disabled = true;
+      $("backBtn").disabled = true;
+      btn.textContent = "جارٍ الحفظ...";
+      try {
+        const blob = pagesToPdfBlob(current.pages);
+        await saveReport({ tpl, data: current.data, pdfBlob: blob });
+        savedBlob = blob;
+        dirty = false;
+        showSheet(`
+          <div class="center">
+            <div class="done-mark">${svgIcon("check")}</div>
+            <h2>تم حفظ المحضر</h2>
+          </div>
+          <div class="sheet-actions">
+            <button class="btn block" id="shareBtn">${svgIcon("share", "icon-sm")}مشاركة PDF</button>
+            <a class="btn secondary block" href="report-new.html?t=${encodeURIComponent(tpl.key)}">محضر جديد من نفس النوع</a>
+            <a class="btn secondary block" href="tool-reports.html">المحاضر</a>
+          </div>`);
+        $("shareBtn").addEventListener("click", () => shareOrDownload(savedBlob, reportFileName(tpl, current.data)));
+      } catch (e) {
+        $("saveMsg").textContent = /fetch|network/i.test(e.message || "") ? "تعذر الاتصال، حاول مرة ثانية" : "تعذر حفظ المحضر، حاول مرة ثانية";
+        btn.disabled = false;
+        $("backBtn").disabled = false;
+        btn.textContent = "حفظ المحضر";
+      }
+    }
+
+    function showSheet(html) {
+      $("sheetInner").innerHTML = html;
+      $("sheet").classList.remove("hidden");
+      $("sheet").scrollTop = 0;
+      document.body.style.overflow = "hidden";
+    }
+    function hideSheet() {
+      $("sheet").classList.add("hidden");
+      document.body.style.overflow = "";
+    }
+
+    (async () => {
+      profile = await requireAuth();
+      if (!profile) return;
+      renderShell("tools");
+      $("crumb").insertAdjacentHTML("afterbegin", svgIcon("chevron", "icon-sm"));
+
+      if (!tpl) {
+        $("pageTitle").textContent = "نوع المحضر غير موجود";
+        $("previewBtn").classList.add("hidden");
+        return;
+      }
+      $("pageTitle").textContent = tpl.title;
+      document.title = `${tpl.title} — سند`;
+      buildForm();
+      loadImage(tpl.image).catch(() => {}); // تحميل القالب مسبقًا
+      $("previewBtn").addEventListener("click", preview);
+
+      window.addEventListener("beforeunload", (e) => {
+        if (dirty) { e.preventDefault(); e.returnValue = ""; }
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -74,7 +74,14 @@
 
       if (!isBuiltin) {
         fields.push(
-          { name: "kind", label: "النوع", type: "select", options: [{ value: "link", label: "رابط" }, { value: "file", label: "ملف" }] },
+          {
+            name: "kind", label: "النوع", type: "select",
+            options: [{ value: "link", label: "رابط" }, { value: "file", label: "ملف" }, ...(Object.keys(BUILTIN_TOOLS).length ? [{ value: "builtin", label: "أداة جاهزة" }] : [])],
+          },
+          {
+            name: "builtin_key", label: "الأداة", type: "select", showIf: { field: "kind", value: "builtin" },
+            options: Object.entries(BUILTIN_TOOLS).map(([k, v]) => ({ value: k, label: v.label })),
+          },
           {
             name: "url", label: "الرابط", type: "text", placeholder: "https://", showIf: { field: "kind", value: "link" },
             validate: (val) => (!val ? "اكتب الرابط." : /^(https?:\/\/)?[^\s.]+\.[^\s]+$/i.test(val) ? "" : "الرابط غير صحيح."),
@@ -103,7 +110,10 @@
           let oldFileToRemove = null;
 
           if (!isBuiltin) {
-            if (v.kind === "link") {
+            if (v.kind === "builtin") {
+              url = "app://" + v.builtin_key;
+              if (oldKind === "file") oldFileToRemove = tool.url;
+            } else if (v.kind === "link") {
               url = normalizeUrl(v.url);
               if (oldKind === "file") oldFileToRemove = tool.url;
             } else if (v.file) {

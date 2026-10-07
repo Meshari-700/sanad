@@ -6,8 +6,10 @@ const TOOL_FILES_BUCKET = "tool-files";
 const TOOL_IMAGES_BUCKET = "tool-images";
 
 // الأدوات الجاهزة: app://<key> ← صفحة داخل التطبيق
-// تنضاف هنا كل أداة نبنيها، مثل: { "my-tool": "tool-my-tool.html" }
-const BUILTIN_TOOLS = {};
+// كل أداة نبنيها تنضاف هنا
+const BUILTIN_TOOLS = {
+  reports: { page: "tool-reports.html", label: "المحاضر" },
+};
 
 async function fetchTools() {
   const { data, error } = await supabaseClient
@@ -26,7 +28,8 @@ function toolKind(tool) {
 }
 
 function builtinPage(tool) {
-  return BUILTIN_TOOLS[(tool.url || "").replace("app://", "")] || null;
+  const t = BUILTIN_TOOLS[(tool.url || "").replace("app://", "")];
+  return t ? t.page : null;
 }
 
 function toolTileHtml(tool) {
