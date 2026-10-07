@@ -38,7 +38,10 @@
         <input id="searchInput" type="search" placeholder="ابحث باسم المنشأة..." autocomplete="off" aria-label="ابحث باسم المنشأة" />
       </label>
       <div class="filter-row hidden" id="filters">
-        <select id="fUser" aria-label="المفتش"><option value="">كل المفتشين</option></select>
+        <select id="fUser" aria-label="عرض محاضر">
+          <option value="mine" selected>محاضري</option>
+          <option value="all">جميع المحاضر</option>
+        </select>
         <select id="fType" aria-label="نوع المحضر"><option value="">كل الأنواع</option></select>
       </div>
 
@@ -69,9 +72,14 @@
       const q = $("searchInput").value;
       const fu = $("fUser").value;
       const ft = $("fType").value;
+      const byUser = (r) =>
+        !isAdmin ? true : fu === "mine" ? r.created_by === profile.id : fu === "all" ? true : r.created_by === fu;
       const visible = reports.filter((r) =>
-        matchesQuery(q, r.shop_name) && (!fu || r.created_by === fu) && (!ft || r.template_key === ft)
+        matchesQuery(q, r.shop_name) && byUser(r) && (!ft || r.template_key === ft)
       );
+      if (isAdmin) {
+        $("listTitle").textContent = fu === "mine" ? "محاضري" : fu === "all" ? "جميع المحاضر" : $("fUser").selectedOptions[0].textContent;
+      }
       $("count").textContent = `${visible.length}`;
       const list = $("list");
       if (!reports.length) {
@@ -85,7 +93,7 @@
       list.innerHTML = `<div class="card list-card">${visible.map((r) => {
         const tpl = getReportTemplate(r.template_key);
         const sub = [formatDate(r.created_at), tpl ? tpl.title : ""];
-        if (isAdmin && r.created_by !== profile.id) sub.push(authorName(r));
+        if (isAdmin && fu === "all" && r.created_by !== profile.id) sub.push(authorName(r));
         return `
           <button class="list-row" data-id="${r.id}">
             ${svgIcon("doc")}
@@ -179,7 +187,6 @@
         </a>`).join("");
 
       if (isAdmin) {
-        $("listTitle").textContent = "كل المحاضر";
         $("filters").classList.remove("hidden");
         $("fType").insertAdjacentHTML("beforeend", REPORT_TEMPLATES.map((t) => `<option value="${t.key}">${escapeHtml(t.title)}</option>`).join(""));
       }
@@ -196,7 +203,7 @@
         reports = await fetchReports();
         if (isAdmin) {
           const users = new Map();
-          reports.forEach((r) => users.set(r.created_by, authorName(r) || "بدون اسم"));
+          reports.forEach((r) => { if (r.created_by && r.created_by !== profile.id) users.set(r.created_by, authorName(r) || "بدون اسم"); });
           $("fUser").insertAdjacentHTML("beforeend", [...users].map(([id, name]) => `<option value="${id}">${escapeHtml(name)}</option>`).join(""));
         }
         render();
