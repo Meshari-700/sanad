@@ -10,6 +10,10 @@
   --primary-tint: #e4f1ed;   /* عناوين الاشتراطات والوسوم */
   --primary-tint-2: #f1f8f5;
 
+  --gold: #c09d63;        /* ذهبي اللوقو — استخدام محدود */
+  --gold-ink: #8a6a2f;
+  --gold-tint: #f7efdf;
+
   --bg: #f6f8f7;
   --surface: #ffffff;
   --border: #e3e8e6;
@@ -95,6 +99,8 @@ a { color: inherit; text-decoration: none; }
   place-items: center;
 }
 .brand-mark .icon { width: 26px; height: 26px; }
+
+.brand-logo { width: 44px; height: 46px; object-fit: contain; flex-shrink: 0; }
 
 .brand-name { font-size: 22px; font-weight: 700; line-height: 1.2; }
 .brand-tagline { font-size: 13px; opacity: 0.78; }
@@ -277,6 +283,8 @@ a { color: inherit; text-decoration: none; }
 }
 .chip-green { background: var(--primary-tint); color: var(--primary); font-weight: 700; }
 .chip-muted { background: var(--muted-bg); color: var(--text-muted); }
+.chip-gold { background: var(--gold-tint); color: var(--gold-ink); font-weight: 700; }
+.list-row .icon.fav-star { color: var(--gold); fill: var(--gold); }
 
 .icon-btn {
   width: 52px;
@@ -294,7 +302,7 @@ a { color: inherit; text-decoration: none; }
 .icon-btn.round { border-radius: 50%; }
 .icon-btn.primary { background: var(--primary); color: #fff; }
 .icon-btn.danger { background: var(--danger-tint); color: var(--danger); }
-.icon-btn.is-on { background: #fff4d6; color: #b7791f; }
+.icon-btn.is-on { background: var(--gold-tint); color: var(--gold-ink); }
 .icon-btn.is-on svg { fill: currentColor; }
 
 /* ==================================================================
@@ -505,7 +513,7 @@ a { color: inherit; text-decoration: none; }
    التوجيهات
    ================================================================== */
 .directive { position: relative; }
-.directive.is-new { border-color: color-mix(in srgb, var(--primary) 35%, var(--border)); }
+.directive.is-new { border-color: color-mix(in srgb, var(--gold) 55%, var(--border)); }
 .directive-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .directive-date { color: var(--text-muted); font-size: 14px; }
 .directive-title { font-size: 18px; font-weight: 700; margin: 0 0 6px; }
@@ -588,26 +596,23 @@ a { color: inherit; text-decoration: none; }
    شاشة الدخول
    ================================================================== */
 .auth-screen {
+  background: var(--surface);
   min-height: 100vh;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
 }
 .auth-top {
-  background: var(--primary);
-  color: #fff;
-  padding: calc(env(safe-area-inset-top, 0px) + 48px) 24px 70px;
+  background: var(--surface);
+  padding: calc(env(safe-area-inset-top, 0px) + 36px) 24px 24px;
   text-align: center;
 }
-.auth-top .brand-mark { width: 72px; height: 72px; border-radius: 22px; margin: 0 auto 14px; }
-.auth-top .brand-mark .icon { width: 38px; height: 38px; }
-.auth-top .brand-name { font-size: 34px; }
-.auth-top .brand-tagline { font-size: 15px; }
+.auth-logo { width: 190px; height: auto; margin: 0 auto; }
 .auth-body {
   width: 100%;
   max-width: 440px;
-  margin: -44px auto 0;
-  padding: 0 20px 40px;
+  margin: 0 auto;
+  padding: 8px 20px 40px;
 }
 .auth-body .card { padding: 24px 20px; }
 .auth-body h2 { margin: 0 0 18px; font-size: 21px; }

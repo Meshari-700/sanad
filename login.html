@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="سند" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <link rel="apple-touch-icon" href="icon.png" />
+  <link rel="apple-touch-icon" href="icon-180.png" />
   <link rel="icon" href="icon.png" />
   <link rel="manifest" href="manifest.json" />
   <link rel="preconnect" href="https://cttooytoziipdcasliah.supabase.co" />
@@ -21,9 +21,7 @@
 <body>
   <div class="auth-screen">
     <div class="auth-top">
-      <div class="brand-mark" id="brandMark"></div>
-      <div class="brand-name">سند</div>
-      <div class="brand-tagline">مرجع الاشتراطات للمفتش الميداني</div>
+      <img class="auth-logo" src="logo.png" alt="سند — مرجعك الموثوق في أعمال التفتيش" />
     </div>
 
     <div class="auth-body">
@@ -60,7 +58,6 @@
     let signupMode = false;
 
     const $ = (id) => document.getElementById(id);
-    $("brandMark").innerHTML = svgIcon("book");
 
     // لو فيه جلسة نشطة، يدخل مباشرة
     getCurrentProfile().then((p) => { if (p && !p.is_disabled) window.location.href = "index.html"; });

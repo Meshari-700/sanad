@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="سند" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <link rel="apple-touch-icon" href="icon.png" />
+  <link rel="apple-touch-icon" href="icon-180.png" />
   <link rel="icon" href="icon.png" />
   <link rel="manifest" href="manifest.json" />
   <link rel="preconnect" href="https://cttooytoziipdcasliah.supabase.co" />
@@ -60,7 +60,7 @@
             <article class="card directive ${isNew ? "is-new" : ""}">
               <div class="directive-meta">
                 <span class="directive-date">${formatDate(d.created_at)}</span>
-                ${isNew ? `<span class="chip chip-green">جديد</span>` : ""}
+                ${isNew ? `<span class="chip chip-gold">جديد</span>` : ""}
               </div>
               <h2 class="directive-title">${escapeHtml(d.title)}</h2>
               ${d.content ? `<p class="directive-body">${escapeHtml(d.content)}</p>` : ""}

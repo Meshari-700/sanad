@@ -8,7 +8,7 @@
 // ==================================================================
 
 const APP_NAME = "سند";
-const APP_TAGLINE = "مرجع الاشتراطات للمفتش الميداني";
+const APP_TAGLINE = "مرجعك الموثوق في أعمال التفتيش";
 
 const NAV_TABS = [
   { key: "home", href: "index.html", label: "الرئيسية", icon: "home" },
@@ -23,7 +23,7 @@ function renderHeader() {
   el.className = "app-header";
   el.innerHTML = `
     <a class="app-header-inner" href="index.html">
-      <span class="brand-mark">${svgIcon("book")}</span>
+      <img class="brand-logo" src="mark-white.png" alt="" />
       <span>
         <div class="brand-name">${APP_NAME}</div>
         <div class="brand-tagline">${APP_TAGLINE}</div>

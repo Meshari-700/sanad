@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="سند" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <link rel="apple-touch-icon" href="icon.png" />
+  <link rel="apple-touch-icon" href="icon-180.png" />
   <link rel="icon" href="icon.png" />
   <link rel="manifest" href="manifest.json" />
   <link rel="preconnect" href="https://cttooytoziipdcasliah.supabase.co" />
@@ -61,7 +61,7 @@
           const req = it.requirement?.name || "";
           return `
             <a class="list-row" href="item.html?id=${encodeURIComponent(it.id)}">
-              ${svgIcon("star")}
+              ${svgIcon("star", "icon fav-star")}
               <span class="grow">
                 <span class="row-title" style="display:block">${escapeHtml(it.title)}</span>
                 <span class="row-sub" style="display:block">${escapeHtml(act)}${req ? "، " + escapeHtml(req) : ""}</span>
