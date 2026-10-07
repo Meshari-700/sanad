@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#126151" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="سند" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="apple-touch-icon" href="icon.png" />
+  <link rel="icon" href="icon.png" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://cttooytoziipdcasliah.supabase.co" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <title>النشاط — سند</title>
+</head>
+<body>
+  <header id="appHeader"></header>
+
+  <main class="page">
+    <a class="breadcrumb" href="activities.html" id="crumb">الأنشطة</a>
+
+    <div class="hero-card" id="hero">
+      <span class="hero-icon skeleton" style="width:56px;height:56px;border-radius:14px"></span>
+      <span class="skeleton" style="width:55%;height:30px;border-radius:8px"></span>
+    </div>
+
+    <section class="section">
+      <div class="section-head">
+        <span id="layersIcon"></span>
+        <h2 class="section-title">الاشتراطات</h2>
+        <span class="spacer"></span>
+        <span class="chip" id="itemsCount">…</span>
+      </div>
+
+      <label class="search">
+        <span id="searchIcon"></span>
+        <input id="searchInput" type="search" placeholder="ابحث داخل الاشتراطات..." autocomplete="off" aria-label="ابحث داخل الاشتراطات" />
+      </label>
+
+      <div class="req-list" id="reqList" aria-live="polite">
+        <div class="skeleton" style="height:58px"></div>
+        <div class="skeleton" style="height:58px"></div>
+      </div>
+    </section>
+  </main>
+
+  <nav id="bottomNav"></nav>
+
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="utils.js"></script>
+  <script src="directives.js"></script>
+  <script src="layout.js"></script>
+  <script src="content.js"></script>
+  <script src="recent.js"></script>
+  <script>
+    const activityId = getParam("id");
+    let requirements = [];
+    const openIds = new Set(); // الاشتراطات المفتوحة يدويًا (تبقى مفتوحة بعد البحث)
+
+    function itemRowHtml(item, index) {
+      return `
+        <a class="item-row ${item.is_suspended ? "is-suspended" : ""}" href="item.html?id=${encodeURIComponent(item.id)}">
+          <span class="item-num">${index + 1}</span>
+          <span class="item-text">
+            <span class="item-title" style="display:block">${escapeHtml(item.title)}</span>
+            ${item.is_suspended ? `<span class="chip chip-muted" style="margin-top:6px">موقوف</span>` : ""}
+            ${item.description ? `<span class="item-desc">${escapeHtml(item.description)}</span>` : ""}
+          </span>
+          ${svgIcon("chevron", "icon-sm chev")}
+        </a>`;
+    }
+
+    function render(query = "") {
+      const list = document.getElementById("reqList");
+      const searching = !!query.trim();
+
+      if (!requirements.length) {
+        list.innerHTML = `<div class="empty"><strong>لا توجد اشتراطات لهذا النشاط بعد</strong>تظهر هنا بعد ما يضيفها المشرف</div>`;
+        return;
+      }
+
+      const blocks = requirements
+        .map((r) => {
+          const reqMatch = searching && matchesQuery(query, r.name);
+          const items = searching && !reqMatch
+            ? r.items.filter((it) => matchesQuery(query, it.title, it.description))
+            : r.items;
+          return { r, items, show: !searching || reqMatch || items.length > 0 };
+        })
+        .filter((b) => b.show);
+
+      if (!blocks.length) {
+        list.innerHTML = `<div class="empty"><strong>لا توجد نتائج</strong>جرّب كلمة أقصر، أو امسح البحث لعرض كل الاشتراطات</div>`;
+        return;
+      }
+
+      list.innerHTML = blocks
+        .map(({ r, items }) => {
+          const isOpen = searching || openIds.has(r.id);
+          return `
+            <div class="req" data-id="${r.id}" open-state="${isOpen}">
+              <button class="req-head" aria-expanded="${isOpen}">
+                ${svgIcon("book")}
+                <span class="name">${escapeHtml(r.name)}</span>
+                <span class="count">${items.length}</span>
+                ${svgIcon("caretDown", "icon-sm caret")}
+              </button>
+              <div class="req-body">
+                ${items.length ? items.map(itemRowHtml).join("") : `<div class="empty-req">لا توجد بنود في هذا الاشتراط بعد</div>`}
+              </div>
+            </div>`;
+        })
+        .join("");
+    }
+
+    (async () => {
+      const profile = await requireAuth();
+      if (!profile) return;
+      renderShell("home");
+
+      document.getElementById("crumb").insertAdjacentHTML("afterbegin", svgIcon("chevron", "icon-sm"));
+      document.getElementById("layersIcon").outerHTML = svgIcon("layers");
+      document.getElementById("searchIcon").outerHTML = svgIcon("search");
+
+      const list = document.getElementById("reqList");
+      list.addEventListener("click", (e) => {
+        const head = e.target.closest(".req-head");
+        if (!head) return;
+        const req = head.closest(".req");
+        const open = req.getAttribute("open-state") !== "true";
+        req.setAttribute("open-state", open);
+        head.setAttribute("aria-expanded", open);
+        open ? openIds.add(req.dataset.id) : openIds.delete(req.dataset.id);
+      });
+
+      const input = document.getElementById("searchInput");
+      input.addEventListener("input", debounce(() => render(input.value), 150));
+
+      if (!activityId) {
+        document.getElementById("hero").innerHTML = `<h1 class="hero-name">النشاط غير موجود</h1>`;
+        list.innerHTML = "";
+        return;
+      }
+
+      try {
+        const [activity, reqs] = await Promise.all([fetchActivity(activityId), fetchRequirementsWithItems(activityId)]);
+        if (!activity) {
+          document.getElementById("hero").innerHTML = `<h1 class="hero-name">النشاط غير موجود</h1>`;
+          list.innerHTML = `<div class="empty">ربما حُذف هذا النشاط. ارجع لقائمة الأنشطة.</div>`;
+          return;
+        }
+
+        document.title = `${activity.name} — سند`;
+        document.getElementById("hero").innerHTML = `
+          <span class="hero-icon">${renderEntityIcon(activity)}</span>
+          <h1 class="hero-name">${escapeHtml(activity.name)}</h1>`;
+        pushRecentActivity(activity.id);
+
+        requirements = reqs;
+        const total = reqs.reduce((n, r) => n + r.items.length, 0);
+        document.getElementById("itemsCount").textContent = `${total} بند`;
+        if (reqs[0]) openIds.add(reqs[0].id); // أول اشتراط مفتوح افتراضيًا
+        render(input.value);
+      } catch (e) {
+        list.innerHTML = `<div class="empty">تعذر تحميل الاشتراطات. تحقق من الاتصال وأعد فتح الصفحة.</div>`;
+      }
+    })();
+  </script>
+</body>
+</html>

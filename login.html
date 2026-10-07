@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#126151" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="سند" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="apple-touch-icon" href="icon.png" />
+  <link rel="icon" href="icon.png" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://cttooytoziipdcasliah.supabase.co" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <title>تسجيل الدخول — سند</title>
+</head>
+<body>
+  <div class="auth-screen">
+    <div class="auth-top">
+      <div class="brand-mark" id="brandMark"></div>
+      <div class="brand-name">سند</div>
+      <div class="brand-tagline">مرجع الاشتراطات للمفتش الميداني</div>
+    </div>
+
+    <div class="auth-body">
+      <div class="card">
+        <h2 id="formTitle">تسجيل الدخول</h2>
+
+        <div class="field hidden" id="nameField">
+          <label for="fullName">الاسم الثلاثي</label>
+          <input id="fullName" type="text" autocomplete="name" maxlength="80" />
+        </div>
+        <div class="field">
+          <label for="email">البريد الإلكتروني</label>
+          <input id="email" type="email" autocomplete="email" inputmode="email" />
+        </div>
+        <div class="field">
+          <label for="password">كلمة المرور</label>
+          <input id="password" type="password" autocomplete="current-password" />
+        </div>
+
+        <p class="msg" id="msg" role="alert"></p>
+        <button class="btn block" id="submitBtn">دخول</button>
+
+        <div class="center" style="margin-top:12px">
+          <button class="link-btn" id="toggleBtn">ما عندك حساب؟ أنشئ حسابًا</button>
+        </div>
+      </div>
+      <p class="center" style="margin-top:16px"><a class="link-btn" href="about.html">حول سند</a></p>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="utils.js"></script>
+  <script>
+    let signupMode = false;
+
+    const $ = (id) => document.getElementById(id);
+    $("brandMark").innerHTML = svgIcon("book");
+
+    // لو فيه جلسة نشطة، يدخل مباشرة
+    getCurrentProfile().then((p) => { if (p && !p.is_disabled) window.location.href = "index.html"; });
+
+    function setMode(isSignup) {
+      signupMode = isSignup;
+      $("formTitle").textContent = isSignup ? "إنشاء حساب" : "تسجيل الدخول";
+      $("submitBtn").textContent = isSignup ? "إنشاء الحساب" : "دخول";
+      $("toggleBtn").textContent = isSignup ? "عندك حساب؟ سجّل دخولك" : "ما عندك حساب؟ أنشئ حسابًا";
+      $("nameField").classList.toggle("hidden", !isSignup);
+      $("password").autocomplete = isSignup ? "new-password" : "current-password";
+      showMsg("");
+    }
+
+    function showMsg(text, type = "error") {
+      $("msg").className = `msg ${type}`;
+      $("msg").textContent = text;
+    }
+
+    function friendlyError(e) {
+      const m = (e && e.message) || "";
+      if (/invalid login credentials/i.test(m)) return "البريد أو كلمة المرور غير صحيحة.";
+      if (/email not confirmed/i.test(m)) return "فعّل حسابك من رابط التأكيد المرسل لبريدك، ثم سجّل دخولك.";
+      if (/already registered|already exists/i.test(m)) return "هذا البريد مسجّل مسبقًا. سجّل دخولك بدل إنشاء حساب.";
+      if (/password/i.test(m)) return "كلمة المرور لازم تكون 6 أحرف أو أكثر.";
+      if (/fetch|network/i.test(m)) return "تعذر الاتصال. تحقق من الإنترنت وحاول مرة ثانية.";
+      return "صار خطأ غير متوقع. حاول مرة ثانية.";
+    }
+
+    $("toggleBtn").addEventListener("click", () => setMode(!signupMode));
+
+    async function submit() {
+      const email = $("email").value.trim();
+      const password = $("password").value;
+      const fullName = $("fullName").value.trim();
+
+      if (!email || !password) return showMsg("اكتب البريد وكلمة المرور.");
+      if (signupMode && fullName.split(/\s+/).filter(Boolean).length < 3) return showMsg("اكتب الاسم الثلاثي كاملًا.");
+
+      $("submitBtn").disabled = true;
+      showMsg("");
+      try {
+        if (signupMode) {
+          const data = await signup(email, password, fullName);
+          if (data.session) {
+            window.location.href = "index.html";
+          } else {
+            setMode(false);
+            showMsg("تم إنشاء الحساب. فعّله من رابط التأكيد المرسل لبريدك، ثم سجّل دخولك.", "success");
+          }
+        } else {
+          await login(email, password);
+          sessionStorage.removeItem(PROFILE_CACHE_KEY);
+          window.location.href = "index.html";
+        }
+      } catch (e) {
+        showMsg(friendlyError(e));
+      } finally {
+        $("submitBtn").disabled = false;
+      }
+    }
+
+    $("submitBtn").addEventListener("click", submit);
+    document.querySelectorAll(".auth-body input").forEach((i) =>
+      i.addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); })
+    );
+  </script>
+</body>
+</html>

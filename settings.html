@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#126151" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="سند" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="apple-touch-icon" href="icon.png" />
+  <link rel="icon" href="icon.png" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://cttooytoziipdcasliah.supabase.co" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <title>الإعدادات — سند</title>
+</head>
+<body>
+  <header id="appHeader"></header>
+
+  <main class="page">
+    <h1 class="page-title" style="margin-bottom:20px">الإعدادات</h1>
+
+    <div class="card profile-card">
+      <span class="avatar" id="avatar"></span>
+      <div style="min-width:0">
+        <div class="profile-name" id="pName"></div>
+        <div class="profile-email" id="pEmail"></div>
+        <span class="chip chip-green" id="pRole" style="margin-top:6px"></span>
+      </div>
+    </div>
+
+    <p class="settings-label">الحساب</p>
+    <div class="card list-card">
+      <a class="list-row" href="account.html" id="accountLink"><span class="grow row-title">حسابي</span></a>
+    </div>
+
+    <div id="adminBlock" class="hidden">
+      <p class="settings-label">الإدارة</p>
+      <div class="card list-card">
+        <a class="list-row" href="admin.html" id="adminLink"><span class="grow row-title">لوحة الإشراف</span></a>
+        <a class="list-row hidden" href="users.html" id="usersLink"><span class="grow row-title">إدارة المستخدمين</span></a>
+      </div>
+    </div>
+
+    <p class="settings-label">التطبيق</p>
+    <div class="card list-card">
+      <a class="list-row" href="about.html" id="aboutLink"><span class="grow row-title">حول سند</span></a>
+    </div>
+
+    <div class="card list-card" style="margin-top:26px">
+      <button class="list-row danger" id="logoutBtn"><span class="grow row-title">تسجيل الخروج</span></button>
+    </div>
+  </main>
+
+  <nav id="bottomNav"></nav>
+
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="utils.js"></script>
+  <script src="directives.js"></script>
+  <script src="layout.js"></script>
+  <script>
+    function decorate(id, icon) {
+      const el = document.getElementById(id);
+      el.insertAdjacentHTML("afterbegin", svgIcon(icon));
+      if (el.tagName === "A") el.insertAdjacentHTML("beforeend", svgIcon("chevron", "icon-sm chev"));
+    }
+
+    (async () => {
+      const profile = await requireAuth();
+      if (!profile) return;
+      renderShell("settings");
+
+      const name = profile.full_name || "بدون اسم";
+      document.getElementById("avatar").textContent = name.trim().charAt(0);
+      document.getElementById("pName").textContent = name;
+      document.getElementById("pEmail").textContent = profile.email || "";
+      document.getElementById("pRole").textContent = roleLabel(profile.role);
+
+      decorate("accountLink", "user");
+      decorate("adminLink", "shield");
+      decorate("usersLink", "users");
+      decorate("aboutLink", "info");
+      decorate("logoutBtn", "logout");
+
+      if (isAdminRole(profile)) document.getElementById("adminBlock").classList.remove("hidden");
+      if (profile.role === "owner") document.getElementById("usersLink").classList.remove("hidden");
+
+      document.getElementById("logoutBtn").addEventListener("click", async () => {
+        const ok = await confirmDialog({ title: "تسجيل الخروج", message: "بتحتاج تدخل بريدك وكلمة المرور مرة ثانية.", confirmText: "تسجيل الخروج", danger: true });
+        if (ok) logout();
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#126151" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="سند" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="apple-touch-icon" href="icon.png" />
+  <link rel="icon" href="icon.png" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://cttooytoziipdcasliah.supabase.co" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <title>حسابي — سند</title>
+</head>
+<body>
+  <header id="appHeader"></header>
+
+  <main class="page">
+    <a class="breadcrumb" href="settings.html" id="crumb">الإعدادات</a>
+    <h1 class="page-title" style="margin-bottom:20px">حسابي</h1>
+
+    <div class="card">
+      <div class="field">
+        <label for="fullName">الاسم الثلاثي</label>
+        <input id="fullName" type="text" autocomplete="name" maxlength="80" />
+      </div>
+      <div class="field">
+        <label for="email">البريد الإلكتروني</label>
+        <input id="email" type="email" disabled />
+      </div>
+      <p class="msg" id="msg"></p>
+      <button class="btn block" id="saveBtn">حفظ الاسم</button>
+    </div>
+  </main>
+
+  <nav id="bottomNav"></nav>
+
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="utils.js"></script>
+  <script src="directives.js"></script>
+  <script src="layout.js"></script>
+  <script>
+    (async () => {
+      const profile = await requireAuth();
+      if (!profile) return;
+      renderShell("settings");
+      document.getElementById("crumb").insertAdjacentHTML("afterbegin", svgIcon("chevron", "icon-sm"));
+
+      const nameInput = document.getElementById("fullName");
+      const msg = document.getElementById("msg");
+      const btn = document.getElementById("saveBtn");
+      nameInput.value = profile.full_name || "";
+      document.getElementById("email").value = profile.email || "";
+
+      btn.addEventListener("click", async () => {
+        const value = nameInput.value.trim();
+        msg.className = "msg";
+        if (value.split(/\s+/).filter(Boolean).length < 3) {
+          msg.className = "msg error";
+          msg.textContent = "اكتب الاسم الثلاثي كاملًا.";
+          return;
+        }
+        btn.disabled = true;
+        try {
+          await setMyName(value);
+          msg.className = "msg success";
+          msg.textContent = "تم حفظ الاسم.";
+        } catch (e) {
+          msg.className = "msg error";
+          msg.textContent = "تعذر حفظ الاسم. تحقق من الاتصال وحاول مرة ثانية.";
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

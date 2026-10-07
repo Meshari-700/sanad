@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#126151" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="سند" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="apple-touch-icon" href="icon.png" />
+  <link rel="icon" href="icon.png" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://cttooytoziipdcasliah.supabase.co" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <title>سند</title>
+</head>
+<body>
+  <header id="appHeader"></header>
+
+  <main class="page">
+    <h1 class="page-title">سند</h1>
+    <p class="page-sub">وصول سريع للاشتراطات حسب النشاط</p>
+
+    <label class="search" style="margin-top:20px">
+      <span id="searchIcon"></span>
+      <input id="searchInput" type="search" placeholder="ابحث عن نشاط، مثل: صيدلية" autocomplete="off" aria-label="ابحث عن نشاط" />
+    </label>
+
+    <!-- نتائج البحث (تستبدل باقي الأقسام أثناء الكتابة) -->
+    <section id="searchResults" class="hidden" aria-live="polite"></section>
+
+    <div id="homeSections">
+      <a class="feature-card" href="activities.html">
+        <span class="brand-mark" id="featureIcon"></span>
+        <span class="text">
+          <span class="feature-title" style="display:block">تصفح الأنشطة</span>
+          <span class="feature-sub" style="display:block">كل الاشتراطات مرتبة حسب نوع النشاط</span>
+        </span>
+        <span class="chev" id="featureChev"></span>
+      </a>
+
+      <section class="section">
+        <div class="section-head" id="recentHead"></div>
+        <div id="recentBox"><div class="tile-grid"><div class="tile skeleton"></div><div class="tile skeleton"></div></div></div>
+      </section>
+
+      <section class="section">
+        <div class="section-head" id="favHead"></div>
+        <div id="favBox"><div class="card skeleton" style="height:120px"></div></div>
+      </section>
+    </div>
+  </main>
+
+  <nav id="bottomNav"></nav>
+
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="utils.js"></script>
+  <script src="directives.js"></script>
+  <script src="layout.js"></script>
+  <script src="content.js"></script>
+  <script src="favorites.js"></script>
+  <script src="recent.js"></script>
+  <script>
+    const FAV_PREVIEW = 5;
+    let allActivities = [];
+
+    function sectionHead(icon, title, extra = "") {
+      return `${svgIcon(icon)}<h2 class="section-title">${title}</h2><span class="spacer"></span>${extra}`;
+    }
+
+    function renderRecent() {
+      const box = document.getElementById("recentBox");
+      const byId = new Map(allActivities.map((a) => [a.id, a]));
+      const ids = pruneRecentActivities(allActivities.map((a) => a.id));
+      const list = ids.map((id) => byId.get(id)).filter(Boolean);
+      if (!list.length) {
+        box.innerHTML = `<div class="empty"><strong>لا توجد أنشطة مفتوحة بعد</strong>أي نشاط تفتحه يظهر هنا للوصول السريع</div>`;
+        return;
+      }
+      box.innerHTML = `<div class="tile-grid">${list.map(activityTileHtml).join("")}</div>`;
+    }
+
+    async function renderFavorites() {
+      const box = document.getElementById("favBox");
+      const head = document.getElementById("favHead");
+      try {
+        const favs = await fetchFavorites(FAV_PREVIEW + 1);
+        const more = favs.length > FAV_PREVIEW;
+        head.innerHTML = sectionHead("star", "المفضلة", more ? `<a class="section-link" href="favorites.html">عرض الكل</a>` : "");
+        if (!favs.length) {
+          box.innerHTML = `<div class="empty"><strong>لا توجد بنود في المفضلة</strong>اضغط النجمة داخل أي بند لحفظه هنا</div>`;
+          return;
+        }
+        box.innerHTML = `<div class="card list-card">${favs.slice(0, FAV_PREVIEW).map(favoriteRowHtml).join("")}</div>`;
+      } catch (e) {
+        box.innerHTML = `<div class="empty">تعذر تحميل المفضلة. تحقق من الاتصال وأعد فتح الصفحة.</div>`;
+      }
+    }
+
+    function favoriteRowHtml(f) {
+      const it = f.item;
+      const activity = it.requirement?.activity?.name || "";
+      const req = it.requirement?.name || "";
+      return `
+        <a class="list-row" href="item.html?id=${encodeURIComponent(it.id)}">
+          ${svgIcon("star")}
+          <span class="grow">
+            <span class="row-title" style="display:block">${escapeHtml(it.title)}</span>
+            <span class="row-sub" style="display:block">${escapeHtml(activity)}${req ? "، " + escapeHtml(req) : ""}</span>
+          </span>
+          ${svgIcon("chevron", "icon-sm chev")}
+        </a>`;
+    }
+
+    function runSearch(q) {
+      const results = document.getElementById("searchResults");
+      const sections = document.getElementById("homeSections");
+      if (!q.trim()) {
+        results.classList.add("hidden");
+        sections.classList.remove("hidden");
+        return;
+      }
+      const matches = allActivities.filter((a) => matchesQuery(q, a.name));
+      sections.classList.add("hidden");
+      results.classList.remove("hidden");
+      results.innerHTML = matches.length
+        ? `<div class="section-head"><h2 class="section-title">النتائج</h2><span class="section-count">${matches.length}</span></div>
+           <div class="tile-grid">${matches.map(activityTileHtml).join("")}</div>`
+        : `<div class="empty"><strong>لا يوجد نشاط بهذا الاسم</strong>جرّب كلمة أقصر، أو تصفح كل الأنشطة</div>`;
+    }
+
+    (async () => {
+      const profile = await requireAuth();
+      if (!profile) return;
+      renderShell("home");
+
+      document.getElementById("searchIcon").outerHTML = svgIcon("search");
+      document.getElementById("featureIcon").innerHTML = svgIcon("grid");
+      document.getElementById("featureChev").innerHTML = svgIcon("chevron");
+      document.getElementById("recentHead").innerHTML = sectionHead("clock", "آخر الأنشطة");
+      document.getElementById("favHead").innerHTML = sectionHead("star", "المفضلة");
+
+      document.getElementById("searchInput").addEventListener("input", debounce((e) => runSearch(e.target.value), 150));
+
+      renderFavorites();
+      try {
+        allActivities = await fetchActivities();
+        renderRecent();
+      } catch (e) {
+        document.getElementById("recentBox").innerHTML = `<div class="empty">تعذر تحميل الأنشطة. تحقق من الاتصال وأعد فتح الصفحة.</div>`;
+      }
+    })();
+  </script>
+</body>
+</html>

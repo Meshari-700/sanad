@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#126151" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="سند" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="apple-touch-icon" href="icon.png" />
+  <link rel="icon" href="icon.png" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://cttooytoziipdcasliah.supabase.co" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <title>الأنشطة — سند</title>
+</head>
+<body>
+  <header id="appHeader"></header>
+
+  <main class="page">
+    <a class="breadcrumb" href="index.html" id="crumb">الرئيسية</a>
+
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">الأنشطة</h1>
+        <p class="page-sub" id="countLabel">&nbsp;</p>
+      </div>
+    </div>
+
+    <label class="search">
+      <span id="searchIcon"></span>
+      <input id="searchInput" type="search" placeholder="ابحث عن نشاط..." autocomplete="off" aria-label="ابحث عن نشاط" />
+    </label>
+
+    <div id="groupsBox" aria-live="polite">
+      <div class="tile-grid"><div class="tile skeleton"></div><div class="tile skeleton"></div><div class="tile skeleton"></div><div class="tile skeleton"></div></div>
+    </div>
+  </main>
+
+  <nav id="bottomNav"></nav>
+
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="utils.js"></script>
+  <script src="directives.js"></script>
+  <script src="layout.js"></script>
+  <script src="content.js"></script>
+  <script>
+    let groups = [];
+    let activities = [];
+
+    function render(query = "") {
+      const box = document.getElementById("groupsBox");
+      const visible = activities.filter((a) => matchesQuery(query, a.name));
+
+      if (!activities.length) {
+        box.innerHTML = `<div class="empty"><strong>لا توجد أنشطة بعد</strong>تظهر هنا بعد ما يضيفها المشرف</div>`;
+        return;
+      }
+      if (!visible.length) {
+        box.innerHTML = `<div class="empty"><strong>لا يوجد نشاط بهذا الاسم</strong>جرّب كلمة أقصر أو تهجئة ثانية</div>`;
+        return;
+      }
+
+      // نجمع الأنشطة تحت مجموعاتها بنفس ترتيب المجموعات، والباقي تحت "أنشطة أخرى"
+      const groupIds = new Set(groups.map((g) => g.id));
+      const blocks = groups.map((g) => ({ group: g, list: visible.filter((a) => a.group_id === g.id) }));
+      const loose = visible.filter((a) => !a.group_id || !groupIds.has(a.group_id));
+      if (loose.length) blocks.push({ group: { name: groups.length ? "أنشطة أخرى" : "", icon_value: null }, list: loose });
+
+      box.innerHTML = blocks
+        .filter((b) => b.list.length)
+        .map((b) => `
+          <section class="group-block">
+            ${b.group.name ? `
+              <div class="section-head">
+                <span class="group-icon">${renderEntityIcon(b.group, "layers")}</span>
+                <h2 class="section-title">${escapeHtml(b.group.name)}</h2>
+                <span class="section-count">${b.list.length}</span>
+              </div>` : ""}
+            <div class="tile-grid">${b.list.map(activityTileHtml).join("")}</div>
+          </section>`)
+        .join("");
+    }
+
+    (async () => {
+      const profile = await requireAuth();
+      if (!profile) return;
+      renderShell("home");
+
+      document.getElementById("crumb").insertAdjacentHTML("afterbegin", svgIcon("chevron", "icon-sm"));
+      document.getElementById("searchIcon").outerHTML = svgIcon("search");
+
+      const input = document.getElementById("searchInput");
+      input.addEventListener("input", debounce(() => render(input.value), 120));
+
+      try {
+        [groups, activities] = await Promise.all([fetchActivityGroups(), fetchActivities()]);
+        document.getElementById("countLabel").textContent = `${activities.length} نشاط`;
+        render(input.value);
+      } catch (e) {
+        document.getElementById("groupsBox").innerHTML = `<div class="empty">تعذر تحميل الأنشطة. تحقق من الاتصال وأعد فتح الصفحة.</div>`;
+      }
+    })();
+  </script>
+</body>
+</html>
