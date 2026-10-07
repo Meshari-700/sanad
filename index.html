@@ -137,7 +137,7 @@
     (async () => {
       const profile = await requireAuth();
       if (!profile) return;
-      renderShell("home");
+      renderShell("home", { sync: true });
 
       document.getElementById("searchIcon").outerHTML = svgIcon("search");
       document.getElementById("featureIcon").innerHTML = svgIcon("grid");
