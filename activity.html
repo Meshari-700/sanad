@@ -35,6 +35,7 @@
         <h2 class="section-title">الاشتراطات</h2>
         <span class="spacer"></span>
         <span class="chip" id="itemsCount">…</span>
+        <a class="icon-btn round primary hidden" id="manageBtn" aria-label="إدارة اشتراطات النشاط" style="width:46px;height:46px"></a>
       </div>
 
       <label class="search">
@@ -127,6 +128,12 @@
       document.getElementById("crumb").insertAdjacentHTML("afterbegin", svgIcon("chevron", "icon-sm"));
       document.getElementById("layersIcon").outerHTML = svgIcon("layers");
       document.getElementById("searchIcon").outerHTML = svgIcon("search");
+      if (isAdminRole(profile) && activityId) {
+        const m = document.getElementById("manageBtn");
+        m.href = `admin-activity.html?id=${encodeURIComponent(activityId)}`;
+        m.innerHTML = svgIcon("edit");
+        m.classList.remove("hidden");
+      }
 
       const list = document.getElementById("reqList");
       list.addEventListener("click", (e) => {

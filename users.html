@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#126151" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="سند" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="apple-touch-icon" href="icon.png" />
+  <link rel="icon" href="icon.png" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://cttooytoziipdcasliah.supabase.co" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <title>المستخدمون — سند</title>
+</head>
+<body>
+  <header id="appHeader"></header>
+
+  <main class="page">
+    <a class="breadcrumb" href="admin.html" id="crumb">لوحة الإشراف</a>
+    <h1 class="page-title">المستخدمون</h1>
+    <p class="page-sub" style="margin-bottom:18px" id="stats">&nbsp;</p>
+
+    <label class="search">
+      <span id="searchIcon"></span>
+      <input id="searchInput" type="search" placeholder="ابحث بالاسم أو البريد..." autocomplete="off" aria-label="ابحث عن مستخدم" />
+    </label>
+
+    <div id="list"><div class="card skeleton" style="height:200px"></div></div>
+  </main>
+
+  <nav id="bottomNav"></nav>
+
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="utils.js"></script>
+  <script src="directives.js"></script>
+  <script src="layout.js"></script>
+  <script src="content.js"></script>
+  <script src="admin.js"></script>
+  <script>
+    let users = [];
+    let me = null;
+
+    function render(query = "") {
+      const counts = { owner: 0, admin: 0, viewer: 0 };
+      users.forEach((u) => counts[u.role]++);
+      document.getElementById("stats").textContent =
+        `${users.length} حساب: ${counts.viewer} مفتش، ${counts.admin} مشرف، ${counts.owner} مالك`;
+
+      const visible = users.filter((u) => matchesQuery(query, u.full_name, u.email));
+      const list = document.getElementById("list");
+      if (!visible.length) {
+        list.innerHTML = `<div class="empty">لا يوجد مستخدم بهذا الاسم أو البريد</div>`;
+        return;
+      }
+      list.innerHTML = `<div class="card list-card">${visible.map((u) => {
+        const self = u.id === me.id;
+        const name = u.full_name || "بدون اسم";
+        return `
+          <div class="admin-row ${u.is_disabled ? "is-muted" : ""}" data-id="${u.id}">
+            <span class="avatar" style="width:40px;height:40px;font-size:17px">${escapeHtml(name.trim().charAt(0))}</span>
+            <span class="grow">
+              <span class="row-title">${escapeHtml(name)}${self ? " (أنت)" : ""}</span>
+              <span class="row-sub" style="direction:ltr;text-align:right">${escapeHtml(u.email || "")}</span>
+              ${u.is_disabled ? `<span class="row-sub">معطّل</span>` : ""}
+            </span>
+            ${self ? `<span class="chip chip-green">${roleLabel(u.role)}</span>` : `
+              <span class="row-actions">
+                <select class="role-select" data-role aria-label="الدور">
+                  ${["viewer", "admin", "owner"].map((r) => `<option value="${r}" ${u.role === r ? "selected" : ""}>${roleLabel(r)}</option>`).join("")}
+                </select>
+                <button class="mini-btn ${u.is_disabled ? "" : "danger"}" data-toggle aria-label="${u.is_disabled ? "تفعيل الحساب" : "تعطيل الحساب"}">${svgIcon(u.is_disabled ? "user" : "eyeOff")}</button>
+              </span>`}
+          </div>`;
+      }).join("")}</div>`;
+    }
+
+    (async () => {
+      me = await requireAuth({ ownerOnly: true });
+      if (!me) return;
+      renderShell("settings");
+      document.getElementById("crumb").insertAdjacentHTML("afterbegin", svgIcon("chevron", "icon-sm"));
+      document.getElementById("searchIcon").outerHTML = svgIcon("search");
+
+      const input = document.getElementById("searchInput");
+      input.addEventListener("input", debounce(() => render(input.value), 150));
+
+      const list = document.getElementById("list");
+
+      list.addEventListener("change", async (e) => {
+        const sel = e.target.closest("[data-role]");
+        if (!sel) return;
+        const u = users.find((x) => x.id === sel.closest("[data-id]").dataset.id);
+        const newRole = sel.value;
+        if (newRole === "owner") {
+          const ok = await confirmDialog({
+            title: "تعيين مالك",
+            message: `${u.full_name || u.email} بيصير عنده نفس صلاحياتك كاملة، ومنها تغيير الأدوار وتعطيل الحسابات.`,
+            confirmText: "تعيين مالك",
+            danger: true,
+          });
+          if (!ok) { sel.value = u.role; return; }
+        }
+        sel.disabled = true;
+        try {
+          await setUserRole(u.id, newRole);
+          u.role = newRole;
+          render(input.value);
+          showToast(`صار الدور: ${roleLabel(newRole)}`);
+        } catch (err) {
+          sel.value = u.role;
+          showToast(adminErrorMessage(err));
+        } finally {
+          sel.disabled = false;
+        }
+      });
+
+      list.addEventListener("click", async (e) => {
+        const btn = e.target.closest("[data-toggle]");
+        if (!btn) return;
+        const u = users.find((x) => x.id === btn.closest("[data-id]").dataset.id);
+        const disable = !u.is_disabled;
+        if (disable) {
+          const ok = await confirmDialog({
+            title: "تعطيل الحساب",
+            message: `${u.full_name || u.email} ما بيقدر يستخدم سند لين تعيد تفعيله.`,
+            confirmText: "تعطيل الحساب",
+            danger: true,
+          });
+          if (!ok) return;
+        }
+        btn.disabled = true;
+        try {
+          await setUserDisabled(u.id, disable);
+          u.is_disabled = disable;
+          render(input.value);
+          showToast(disable ? "عُطّل الحساب" : "فُعّل الحساب");
+        } catch (err) {
+          showToast(adminErrorMessage(err));
+          btn.disabled = false;
+        }
+      });
+
+      try {
+        users = await fetchAllProfiles();
+        render();
+      } catch (err) {
+        list.innerHTML = `<div class="empty">تعذر تحميل المستخدمين. تحقق من الاتصال وأعد فتح الصفحة.</div>`;
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#126151" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="سند" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="apple-touch-icon" href="icon.png" />
+  <link rel="icon" href="icon.png" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://cttooytoziipdcasliah.supabase.co" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <title>إدارة الأنشطة — سند</title>
+</head>
+<body>
+  <header id="appHeader"></header>
+
+  <main class="page">
+    <a class="breadcrumb" href="admin.html" id="crumb">لوحة الإشراف</a>
+    <h1 class="page-title" style="margin-bottom:20px">الأنشطة والاشتراطات</h1>
+
+    <section class="admin-block">
+      <div class="section-head"><span id="hGroups"></span><h2 class="section-title">مجموعات الأنشطة</h2></div>
+      <div id="groupsBox"><div class="card skeleton" style="height:120px"></div></div>
+    </section>
+
+    <section class="admin-block">
+      <div class="section-head"><span id="hActs"></span><h2 class="section-title">الأنشطة</h2><span class="spacer"></span><span class="chip" id="actCount"></span></div>
+      <p class="page-sub" style="margin:-6px 0 14px">اضغط على النشاط لإدارة اشتراطاته وبنوده</p>
+      <div id="actsBox"><div class="card skeleton" style="height:200px"></div></div>
+    </section>
+  </main>
+
+  <nav id="bottomNav"></nav>
+
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="utils.js"></script>
+  <script src="directives.js"></script>
+  <script src="layout.js"></script>
+  <script src="content.js"></script>
+  <script src="admin.js"></script>
+  <script src="admin-ui.js"></script>
+  <script>
+    let groups = [];
+    let activities = [];
+
+    function iconCell(entity, fallback) {
+      return `<span class="row-icon">${renderEntityIcon(entity, fallback)}</span>`;
+    }
+
+    // ---------------- المجموعات ----------------
+    function renderGroups() {
+      const box = document.getElementById("groupsBox");
+      box.innerHTML = `
+        <div class="card list-card" data-list="groups">
+          ${groups.map((g, i) => `
+            <div class="admin-row">
+              ${iconCell(g, "layers")}
+              <span class="grow">
+                <span class="row-title">${escapeHtml(g.name)}</span>
+                <span class="row-sub">${activities.filter((a) => a.group_id === g.id).length} نشاط</span>
+              </span>
+              ${rowActionsHtml(i, groups.length)}
+            </div>`).join("")}
+          <button class="add-row" data-act="add">${svgIcon("plus", "icon-sm")}إضافة مجموعة</button>
+        </div>`;
+    }
+
+    function groupForm(group) {
+      return formDialog({
+        title: group ? "تعديل المجموعة" : "إضافة مجموعة",
+        submitText: group ? "حفظ التعديل" : "إضافة",
+        values: group ? { name: group.name, icon_type: group.icon_type, icon_value: group.icon_value } : {},
+        fields: [
+          { name: "name", label: "اسم المجموعة", type: "text", required: true, maxlength: 60, placeholder: "مثل: أنشطة صحية" },
+          { name: "icon", label: "الأيقونة", type: "icon" },
+        ],
+        onSubmit: async (v) => {
+          const icon = await resolveIconValues(v.icon, group, "groups");
+          if (group) {
+            await updateRow("activity_groups", group.id, { name: v.name, ...icon });
+            Object.assign(group, { name: v.name, ...icon });
+          } else {
+            groups.push(await createRow("activity_groups", { name: v.name, ...icon, sort_order: nextSortOrder(groups) }));
+          }
+        },
+      });
+    }
+
+    async function onGroupsClick(e) {
+      const btn = e.target.closest("button[data-act]");
+      if (!btn) return;
+      const i = Number(btn.dataset.i);
+      const act = btn.dataset.act;
+      try {
+        if (act === "add" && (await groupForm(null))) { renderAll(); showToast("أُضيفت المجموعة"); }
+        if (act === "edit" && (await groupForm(groups[i]))) { renderAll(); showToast("حُفظ التعديل"); }
+        if (act === "up" || act === "down") {
+          groups = await moveRow("activity_groups", groups, i, act === "up" ? -1 : 1);
+          renderAll();
+        }
+        if (act === "delete") {
+          const g = groups[i];
+          const ok = await confirmDialog({
+            title: `حذف مجموعة "${g.name}"`,
+            message: "أنشطة هذه المجموعة ما تنحذف، تنتقل لقسم \"أنشطة أخرى\".",
+            confirmText: "حذف المجموعة",
+            danger: true,
+          });
+          if (!ok) return;
+          await deleteGroupCompletely(g);
+          groups.splice(i, 1);
+          activities.forEach((a) => { if (a.group_id === g.id) a.group_id = null; });
+          renderAll();
+          showToast("حُذفت المجموعة");
+        }
+      } catch (err) {
+        showToast(adminErrorMessage(err));
+      }
+    }
+
+    // ---------------- الأنشطة ----------------
+    function activitiesOf(groupId) {
+      const ids = new Set(groups.map((g) => g.id));
+      return activities
+        .filter((a) => (groupId ? a.group_id === groupId : !a.group_id || !ids.has(a.group_id)))
+        .sort(bySortOrder);
+    }
+
+    function renderActivities() {
+      document.getElementById("actCount").textContent = `${activities.length} نشاط`;
+      const blocks = [...groups.map((g) => ({ id: g.id, name: g.name })), { id: "", name: groups.length ? "أنشطة أخرى (بدون مجموعة)" : "" }];
+      document.getElementById("actsBox").innerHTML = blocks
+        .map((b) => {
+          const list = activitiesOf(b.id);
+          if (!b.id && !list.length && groups.length) return "";
+          return `
+            <div class="card list-card" data-group="${b.id}" style="margin-bottom:14px">
+              ${b.name ? `<div class="admin-sub-head"><span class="grow">${escapeHtml(b.name)}</span><span class="section-count">${list.length}</span></div>` : ""}
+              ${list.map((a, i) => `
+                <div class="admin-row">
+                  ${iconCell(a, "grid")}
+                  <a class="grow" href="admin-activity.html?id=${encodeURIComponent(a.id)}"><span class="row-title">${escapeHtml(a.name)}</span></a>
+                  ${rowActionsHtml(i, list.length)}
+                </div>`).join("")}
+              <button class="add-row" data-act="add">${svgIcon("plus", "icon-sm")}إضافة نشاط${b.name && b.id ? " هنا" : ""}</button>
+            </div>`;
+        })
+        .join("");
+    }
+
+    function activityForm(activity, defaultGroupId) {
+      const options = [{ value: "", label: "بدون مجموعة" }, ...groups.map((g) => ({ value: g.id, label: g.name }))];
+      return formDialog({
+        title: activity ? "تعديل النشاط" : "إضافة نشاط",
+        submitText: activity ? "حفظ التعديل" : "إضافة",
+        values: activity
+          ? { name: activity.name, group_id: activity.group_id || "", icon_type: activity.icon_type, icon_value: activity.icon_value }
+          : { group_id: defaultGroupId || "" },
+        fields: [
+          { name: "name", label: "اسم النشاط", type: "text", required: true, maxlength: 80, placeholder: "مثل: صالون حلاقة" },
+          { name: "group_id", label: "المجموعة", type: "select", options },
+          { name: "icon", label: "الأيقونة", type: "icon" },
+        ],
+        onSubmit: async (v) => {
+          const icon = await resolveIconValues(v.icon, activity, "activities");
+          const groupId = v.group_id || null;
+          if (activity) {
+            const values = { name: v.name, group_id: groupId, ...icon };
+            if (groupId !== activity.group_id) values.sort_order = nextSortOrder(activitiesOf(groupId || ""));
+            await updateRow("activities", activity.id, values);
+            Object.assign(activity, values);
+          } else {
+            activities.push(await createRow("activities", {
+              name: v.name, group_id: groupId, ...icon, sort_order: nextSortOrder(activitiesOf(groupId || "")),
+            }));
+          }
+        },
+      });
+    }
+
+    async function onActivitiesClick(e) {
+      const btn = e.target.closest("button[data-act]");
+      if (!btn) return;
+      const groupId = btn.closest("[data-group]").dataset.group;
+      const list = activitiesOf(groupId);
+      const i = Number(btn.dataset.i);
+      const act = btn.dataset.act;
+      try {
+        if (act === "add" && (await activityForm(null, groupId))) { renderAll(); showToast("أُضيف النشاط"); }
+        if (act === "edit" && (await activityForm(list[i]))) { renderAll(); showToast("حُفظ التعديل"); }
+        if (act === "up" || act === "down") {
+          await moveRow("activities", list, i, act === "up" ? -1 : 1);
+          renderAll();
+        }
+        if (act === "delete") {
+          const a = list[i];
+          const ok = await confirmDialog({
+            title: `حذف نشاط "${a.name}"`,
+            message: "بينحذف النشاط مع كل اشتراطاته وبنوده وصورها، ولا يمكن التراجع.",
+            confirmText: "حذف النشاط",
+            danger: true,
+            typedWord: "حذف",
+          });
+          if (!ok) return;
+          await deleteActivityCompletely(a);
+          activities = activities.filter((x) => x.id !== a.id);
+          renderAll();
+          showToast("حُذف النشاط");
+        }
+      } catch (err) {
+        showToast(adminErrorMessage(err));
+      }
+    }
+
+    function renderAll() {
+      renderGroups();
+      renderActivities();
+    }
+
+    (async () => {
+      const profile = await requireAuth({ adminOnly: true });
+      if (!profile) return;
+      renderShell("settings");
+      document.getElementById("crumb").insertAdjacentHTML("afterbegin", svgIcon("chevron", "icon-sm"));
+      document.getElementById("hGroups").outerHTML = svgIcon("layers");
+      document.getElementById("hActs").outerHTML = svgIcon("grid");
+
+      document.getElementById("groupsBox").addEventListener("click", onGroupsClick);
+      document.getElementById("actsBox").addEventListener("click", onActivitiesClick);
+
+      try {
+        [groups, activities] = await Promise.all([fetchActivityGroups(), fetchActivities()]);
+        renderAll();
+      } catch (e) {
+        document.getElementById("actsBox").innerHTML = `<div class="empty">تعذر تحميل البيانات. تحقق من الاتصال وأعد فتح الصفحة.</div>`;
+        document.getElementById("groupsBox").innerHTML = "";
+      }
+    })();
+  </script>
+</body>
+</html>

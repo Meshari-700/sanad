@@ -41,7 +41,7 @@
   <script>
     const itemId = getParam("id");
 
-    function render(item, fav) {
+    function render(item, fav, canEdit) {
       const req = item.requirement || {};
       const act = req.activity || {};
       const images = item.images || [];
@@ -62,6 +62,7 @@
               ${item.is_suspended ? `<span class="chip chip-muted">${svgIcon("pause", "icon-sm")}موقوف</span>` : ""}
             </div>
             <div class="detail-actions">
+              ${canEdit ? `<a class="icon-btn" href="admin-item.html?id=${encodeURIComponent(item.id)}" aria-label="تعديل البند">${svgIcon("edit")}</a>` : ""}
               <button class="icon-btn ${fav ? "is-on" : ""}" id="favBtn" aria-pressed="${fav}" aria-label="${fav ? "إزالة من المفضلة" : "إضافة للمفضلة"}">${svgIcon("star")}</button>
             </div>
           </div>
@@ -131,7 +132,7 @@
           box.innerHTML = `<div class="empty"><strong>البند غير موجود</strong>ربما حُذف. ارجع لقائمة الأنشطة.</div>`;
           return;
         }
-        render(item, fav);
+        render(item, fav, isAdminRole(profile));
       } catch (e) {
         box.innerHTML = `<div class="empty">تعذر تحميل البند. تحقق من الاتصال وأعد فتح الصفحة.</div>`;
       }

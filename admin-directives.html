@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#126151" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="سند" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="apple-touch-icon" href="icon.png" />
+  <link rel="icon" href="icon.png" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://cttooytoziipdcasliah.supabase.co" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <title>إدارة التوجيهات — سند</title>
+</head>
+<body>
+  <header id="appHeader"></header>
+
+  <main class="page">
+    <a class="breadcrumb" href="admin.html" id="crumb">لوحة الإشراف</a>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">التوجيهات</h1>
+        <p class="page-sub">التوجيه الجديد يظهر للمفتشين مع نقطة تنبيه</p>
+      </div>
+      <button class="icon-btn round primary" id="addBtn" aria-label="نشر توجيه جديد"></button>
+    </div>
+    <div id="list"><div class="card skeleton" style="height:130px"></div></div>
+  </main>
+
+  <nav id="bottomNav"></nav>
+
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="utils.js"></script>
+  <script src="directives.js"></script>
+  <script src="layout.js"></script>
+  <script src="content.js"></script>
+  <script src="admin.js"></script>
+  <script src="admin-ui.js"></script>
+  <script>
+    let items = [];
+    let activeUsers = 0;
+
+    function render() {
+      const list = document.getElementById("list");
+      if (!items.length) {
+        list.innerHTML = `<div class="empty"><strong>لا توجد توجيهات</strong>اضغط + لنشر أول توجيه</div>`;
+        return;
+      }
+      list.innerHTML = items.map((d, i) => `
+        <article class="card directive">
+          <div class="directive-meta">
+            <span class="directive-date">${formatDate(d.created_at)}</span>
+            <span class="spacer" style="flex:1"></span>
+            <span class="stat">قرأه ${d.reads} من ${activeUsers}</span>
+          </div>
+          <h2 class="directive-title">${escapeHtml(d.title)}</h2>
+          ${d.content ? `<p class="directive-body">${escapeHtml(d.content)}</p>` : ""}
+          <div class="row-actions" style="margin-top:14px">
+            <button class="mini-btn" data-act="edit" data-i="${i}" aria-label="تعديل">${svgIcon("edit")}</button>
+            <button class="mini-btn danger" data-act="delete" data-i="${i}" aria-label="حذف">${svgIcon("trash")}</button>
+          </div>
+        </article>`).join("");
+    }
+
+    function directiveForm(d) {
+      return formDialog({
+        title: d ? "تعديل التوجيه" : "توجيه جديد",
+        submitText: d ? "حفظ التعديل" : "نشر",
+        values: d ? { title: d.title, content: d.content } : {},
+        fields: [
+          { name: "title", label: "العنوان", type: "text", required: true, maxlength: 150 },
+          { name: "content", label: "النص", type: "textarea", rows: 6, maxlength: 5000 },
+        ],
+        onSubmit: async (v) => {
+          const values = { title: v.title, content: v.content || null };
+          if (d) {
+            await updateRow("directives", d.id, values);
+            Object.assign(d, values);
+          } else {
+            const row = await createRow("directives", values);
+            items.unshift({ ...row, reads: 0 });
+          }
+        },
+      });
+    }
+
+    (async () => {
+      const profile = await requireAuth({ adminOnly: true });
+      if (!profile) return;
+      renderShell("settings");
+      document.getElementById("crumb").insertAdjacentHTML("afterbegin", svgIcon("chevron", "icon-sm"));
+      document.getElementById("addBtn").innerHTML = svgIcon("plus");
+
+      document.getElementById("addBtn").addEventListener("click", async () => {
+        if (await directiveForm(null)) { render(); showToast("نُشر التوجيه"); }
+      });
+
+      document.getElementById("list").addEventListener("click", async (e) => {
+        const btn = e.target.closest("button[data-act]");
+        if (!btn) return;
+        const d = items[Number(btn.dataset.i)];
+        try {
+          if (btn.dataset.act === "edit" && (await directiveForm(d))) { render(); showToast("حُفظ التعديل"); }
+          if (btn.dataset.act === "delete") {
+            const ok = await confirmDialog({ title: "حذف التوجيه", message: `"${d.title}" بينحذف ويختفي من عند كل المفتشين.`, confirmText: "حذف التوجيه", danger: true });
+            if (!ok) return;
+            await deleteRow("directives", d.id);
+            items = items.filter((x) => x.id !== d.id);
+            render();
+            showToast("حُذف التوجيه");
+          }
+        } catch (err) {
+          showToast(adminErrorMessage(err));
+        }
+      });
+
+      try {
+        [items, activeUsers] = await Promise.all([fetchDirectivesWithReads(), countActiveUsers()]);
+        render();
+      } catch (e) {
+        document.getElementById("list").innerHTML = `<div class="empty">تعذر تحميل التوجيهات. تحقق من الاتصال وأعد فتح الصفحة.</div>`;
+      }
+    })();
+  </script>
+</body>
+</html>

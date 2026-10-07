@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#126151" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="سند" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="apple-touch-icon" href="icon.png" />
+  <link rel="icon" href="icon.png" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://cttooytoziipdcasliah.supabase.co" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <title>البند — إدارة — سند</title>
+</head>
+<body>
+  <header id="appHeader"></header>
+
+  <main class="page">
+    <a class="breadcrumb" href="admin-activities.html" id="crumb">رجوع</a>
+
+    <div class="page-head">
+      <div style="min-width:0">
+        <h1 class="page-title" id="pageTitle">…</h1>
+        <p class="page-sub" id="pageSub">&nbsp;</p>
+      </div>
+      <a class="icon-btn hidden" id="viewBtn" aria-label="عرض كما يراه المفتش"></a>
+    </div>
+
+    <div class="card">
+      <div class="field">
+        <label for="title">عنوان البند</label>
+        <input id="title" type="text" maxlength="300" placeholder="مثل: هل لدى العامل شهادة صحية سارية؟" />
+      </div>
+      <div class="field">
+        <label for="description">الوصف</label>
+        <textarea id="description" rows="4" maxlength="3000"></textarea>
+      </div>
+      <div class="field">
+        <label for="notes">ملاحظات</label>
+        <textarea id="notes" rows="3" maxlength="3000"></textarea>
+        <div class="field-hint">تظهر للمفتش في بطاقة "ملاحظات" داخل البند. اتركها فاضية لو ما فيه ملاحظات.</div>
+      </div>
+      <label class="check-row"><input type="checkbox" id="suspended" /><span>البند موقوف</span></label>
+      <div class="field-hint" style="margin:-10px 0 16px">يبقى ظاهرًا للمفتش لكن بشكل باهت مع وسم "موقوف".</div>
+
+      <p class="msg" id="msg" role="alert"></p>
+      <button class="btn block" id="saveBtn">حفظ</button>
+    </div>
+
+    <section class="card hidden" id="photosCard">
+      <div class="card-head"><span id="imgIcon"></span>الصور <span class="section-count" id="photoCount"></span></div>
+      <div class="photo-edit" id="photoGrid"></div>
+      <input type="file" id="photoInput" accept="image/*" multiple class="hidden" />
+    </section>
+    <div class="empty hidden" id="photosLater" style="margin-top:16px">احفظ البند أولًا، وبعدها تقدر تضيف حتى 3 صور.</div>
+
+    <button class="btn block danger hidden" id="deleteBtn" style="margin-top:24px">حذف البند</button>
+  </main>
+
+  <nav id="bottomNav"></nav>
+
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="utils.js"></script>
+  <script src="directives.js"></script>
+  <script src="layout.js"></script>
+  <script src="content.js"></script>
+  <script src="admin.js"></script>
+  <script>
+    const MAX_PHOTOS = 3;
+    const itemId = getParam("id");
+    const newForRequirement = getParam("requirement");
+    let item = null;
+    let images = [];
+    let activityId = null;
+
+    const $ = (id) => document.getElementById(id);
+
+    function setCrumb(activity) {
+      if (!activity) return;
+      activityId = activity.id;
+      $("crumb").href = `admin-activity.html?id=${encodeURIComponent(activity.id)}`;
+      $("crumb").innerHTML = svgIcon("chevron", "icon-sm") + escapeHtml(activity.name);
+    }
+
+    function showMsg(text, type = "error") {
+      $("msg").className = `msg ${type}`;
+      $("msg").textContent = text;
+    }
+
+    function renderPhotos() {
+      $("photoCount").textContent = `${images.length}/${MAX_PHOTOS}`;
+      $("photoGrid").innerHTML =
+        images.map((img, i) => `
+          <div class="photo-slot">
+            <img src="${escapeHtml(itemImageUrl(img.storage_path))}" alt="" />
+            <button class="mini-btn danger" data-del="${i}" aria-label="حذف الصورة">${svgIcon("trash")}</button>
+          </div>`).join("") +
+        (images.length < MAX_PHOTOS
+          ? `<button class="photo-add" id="addPhoto">${svgIcon("camera")}إضافة صورة</button>`
+          : "");
+    }
+
+    async function onPhotoGridClick(e) {
+      if (e.target.closest("#addPhoto")) { $("photoInput").click(); return; }
+      const del = e.target.closest("[data-del]");
+      if (!del) return;
+      const img = images[Number(del.dataset.del)];
+      const ok = await confirmDialog({ title: "حذف الصورة", message: "بتنحذف الصورة نهائيًا من البند.", confirmText: "حذف الصورة", danger: true });
+      if (!ok) return;
+      try {
+        await deleteItemImage(img);
+        images = images.filter((x) => x.id !== img.id);
+        renderPhotos();
+        showToast("حُذفت الصورة");
+      } catch (err) {
+        showToast(adminErrorMessage(err));
+      }
+    }
+
+    async function onPhotosChosen() {
+      const files = Array.from($("photoInput").files).slice(0, MAX_PHOTOS - images.length);
+      $("photoInput").value = "";
+      if (!files.length) return;
+      $("photoGrid").insertAdjacentHTML("beforeend", `<div class="loading" id="uploading">جارٍ رفع ${files.length > 1 ? files.length + " صور" : "الصورة"}...</div>`);
+      $("addPhoto")?.classList.add("hidden");
+      for (const file of files) {
+        try {
+          images.push(await uploadItemImage(item.id, file, nextSortOrder(images)));
+        } catch (err) {
+          showToast(adminErrorMessage(err, "تعذر رفع الصورة. حاول مرة ثانية."));
+          break;
+        }
+      }
+      renderPhotos();
+    }
+
+    async function save() {
+      const values = {
+        title: $("title").value.trim(),
+        description: $("description").value.trim() || null,
+        notes: $("notes").value.trim() || null,
+        is_suspended: $("suspended").checked,
+      };
+      if (!values.title) return showMsg("اكتب عنوان البند.");
+
+      $("saveBtn").disabled = true;
+      showMsg("");
+      try {
+        if (item) {
+          await updateRow("items", item.id, values);
+          Object.assign(item, values);
+          $("pageTitle").textContent = values.title;
+          showMsg("تم حفظ البند.", "success");
+        } else {
+          const { data: siblings, error } = await supabaseClient.from("items").select("sort_order").eq("requirement_id", newForRequirement);
+          if (error) throw error;
+          const created = await createRow("items", { ...values, requirement_id: newForRequirement, sort_order: nextSortOrder(siblings) });
+          window.location.replace(`admin-item.html?id=${encodeURIComponent(created.id)}&created=1`);
+          return;
+        }
+      } catch (err) {
+        showMsg(adminErrorMessage(err));
+      } finally {
+        $("saveBtn").disabled = false;
+      }
+    }
+
+    async function remove() {
+      const ok = await confirmDialog({
+        title: "حذف البند",
+        message: `"${item.title}" بينحذف مع صوره، ولا يمكن التراجع.`,
+        confirmText: "حذف البند",
+        danger: true,
+      });
+      if (!ok) return;
+      try {
+        await deleteItemCompletely(item.id);
+        window.location.replace(activityId ? `admin-activity.html?id=${encodeURIComponent(activityId)}` : "admin-activities.html");
+      } catch (err) {
+        showToast(adminErrorMessage(err));
+      }
+    }
+
+    (async () => {
+      const profile = await requireAuth({ adminOnly: true });
+      if (!profile) return;
+      renderShell("settings");
+      $("crumb").insertAdjacentHTML("afterbegin", svgIcon("chevron", "icon-sm"));
+      $("imgIcon").outerHTML = svgIcon("image");
+
+      $("saveBtn").addEventListener("click", save);
+      $("deleteBtn").addEventListener("click", remove);
+      $("photoGrid").addEventListener("click", onPhotoGridClick);
+      $("photoInput").addEventListener("change", onPhotosChosen);
+
+      try {
+        if (itemId) {
+          item = await fetchItem(itemId);
+          if (!item) { $("pageTitle").textContent = "البند غير موجود"; return; }
+          setCrumb(item.requirement?.activity);
+          $("pageTitle").textContent = item.title;
+          $("pageSub").textContent = item.requirement?.name || "";
+          $("title").value = item.title;
+          $("description").value = item.description || "";
+          $("notes").value = item.notes || "";
+          $("suspended").checked = !!item.is_suspended;
+          $("saveBtn").textContent = "حفظ التعديل";
+          images = item.images || [];
+          renderPhotos();
+          $("photosCard").classList.remove("hidden");
+          $("deleteBtn").classList.remove("hidden");
+          $("viewBtn").href = `item.html?id=${encodeURIComponent(item.id)}`;
+          $("viewBtn").innerHTML = svgIcon("book");
+          $("viewBtn").classList.remove("hidden");
+          if (getParam("created")) showToast("أُضيف البند. تقدر الحين تضيف صوره.");
+        } else if (newForRequirement) {
+          const { data: req, error } = await supabaseClient
+            .from("requirements")
+            .select("id, name, activity:activities(id, name)")
+            .eq("id", newForRequirement)
+            .maybeSingle();
+          if (error) throw error;
+          if (!req) { $("pageTitle").textContent = "الاشتراط غير موجود"; return; }
+          setCrumb(req.activity);
+          $("pageTitle").textContent = "بند جديد";
+          $("pageSub").textContent = req.name;
+          $("saveBtn").textContent = "إضافة البند";
+          $("photosLater").classList.remove("hidden");
+          $("title").focus();
+        } else {
+          $("pageTitle").textContent = "البند غير موجود";
+        }
+      } catch (e) {
+        showMsg("تعذر تحميل البند. تحقق من الاتصال وأعد فتح الصفحة.");
+      }
+    })();
+  </script>
+</body>
+</html>

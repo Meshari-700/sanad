@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#126151" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="سند" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="apple-touch-icon" href="icon.png" />
+  <link rel="icon" href="icon.png" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://cttooytoziipdcasliah.supabase.co" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <title>إدارة النشاط — سند</title>
+</head>
+<body>
+  <header id="appHeader"></header>
+
+  <main class="page">
+    <a class="breadcrumb" href="admin-activities.html" id="crumb">الأنشطة والاشتراطات</a>
+
+    <div class="page-head">
+      <div style="min-width:0">
+        <h1 class="page-title" id="actName">…</h1>
+        <p class="page-sub" id="actStats">&nbsp;</p>
+      </div>
+      <a class="icon-btn" id="viewBtn" aria-label="عرض كما يراه المفتش"></a>
+    </div>
+
+    <div id="reqBox"><div class="card skeleton" style="height:200px"></div></div>
+  </main>
+
+  <nav id="bottomNav"></nav>
+
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="utils.js"></script>
+  <script src="directives.js"></script>
+  <script src="layout.js"></script>
+  <script src="content.js"></script>
+  <script src="admin.js"></script>
+  <script src="admin-ui.js"></script>
+  <script>
+    const activityId = getParam("id");
+    let requirements = [];
+
+    function render() {
+      const total = requirements.reduce((n, r) => n + r.items.length, 0);
+      document.getElementById("actStats").textContent = `${requirements.length} اشتراط، ${total} بند`;
+
+      const box = document.getElementById("reqBox");
+      box.innerHTML = `
+        ${requirements.map((r, ri) => `
+          <div class="card list-card" data-ri="${ri}" style="margin-bottom:14px">
+            <div class="admin-sub-head" data-scope="req">
+              ${svgIcon("book")}
+              <span class="grow">${escapeHtml(r.name)}</span>
+              ${rowActionsHtml(ri, requirements.length)}
+            </div>
+            <div data-scope="item">
+              ${r.items.map((it, ii) => `
+                <div class="admin-row ${it.is_suspended ? "is-muted" : ""}">
+                  <span class="item-num" style="align-self:center">${ii + 1}</span>
+                  <a class="grow" href="admin-item.html?id=${encodeURIComponent(it.id)}">
+                    <span class="row-title">${escapeHtml(it.title)}</span>
+                    ${it.is_suspended ? `<span class="row-sub">موقوف</span>` : ""}
+                  </a>
+                  ${rowActionsHtml(ii, r.items.length, { edit: false })}
+                </div>`).join("")}
+              <a class="add-row" href="admin-item.html?requirement=${encodeURIComponent(r.id)}">${svgIcon("plus", "icon-sm")}إضافة بند</a>
+            </div>
+          </div>`).join("")}
+        <button class="btn block secondary" id="addReqBtn">${svgIcon("plus", "icon-sm")}إضافة اشتراط</button>`;
+
+      if (!requirements.length) {
+        box.insertAdjacentHTML("afterbegin", `<div class="empty" style="margin-bottom:14px"><strong>لا توجد اشتراطات بعد</strong>ابدأ بإضافة أول اشتراط، ثم أضف بنوده</div>`);
+      }
+    }
+
+    function requirementForm(req) {
+      return formDialog({
+        title: req ? "تعديل الاشتراط" : "إضافة اشتراط",
+        submitText: req ? "حفظ التعديل" : "إضافة",
+        values: req ? { name: req.name } : {},
+        fields: [{ name: "name", label: "اسم الاشتراط", type: "text", required: true, maxlength: 120, placeholder: "مثل: النظافة العامة" }],
+        onSubmit: async (v) => {
+          if (req) {
+            await updateRow("requirements", req.id, { name: v.name });
+            req.name = v.name;
+          } else {
+            const row = await createRow("requirements", { activity_id: activityId, name: v.name, sort_order: nextSortOrder(requirements) });
+            row.items = [];
+            requirements.push(row);
+          }
+        },
+      });
+    }
+
+    async function onClick(e) {
+      if (e.target.closest("#addReqBtn")) {
+        if (await requirementForm(null)) { render(); showToast("أُضيف الاشتراط"); }
+        return;
+      }
+      const btn = e.target.closest("button[data-act]");
+      if (!btn) return;
+      const card = btn.closest("[data-ri]");
+      const ri = Number(card.dataset.ri);
+      const scope = btn.closest("[data-scope]").dataset.scope;
+      const i = Number(btn.dataset.i);
+      const act = btn.dataset.act;
+      const req = requirements[ri];
+
+      try {
+        if (scope === "req") {
+          if (act === "edit" && (await requirementForm(req))) { render(); showToast("حُفظ التعديل"); }
+          if (act === "up" || act === "down") {
+            requirements = await moveRow("requirements", requirements, i, act === "up" ? -1 : 1);
+            render();
+          }
+          if (act === "delete") {
+            const ok = await confirmDialog({
+              title: `حذف اشتراط "${req.name}"`,
+              message: `بينحذف مع بنوده (${req.items.length}) وصورها، ولا يمكن التراجع.`,
+              confirmText: "حذف الاشتراط",
+              danger: true,
+              typedWord: req.items.length ? "حذف" : null,
+            });
+            if (!ok) return;
+            await deleteRequirementCompletely(req.id);
+            requirements.splice(ri, 1);
+            render();
+            showToast("حُذف الاشتراط");
+          }
+        } else {
+          if (act === "up" || act === "down") {
+            req.items = await moveRow("items", req.items, i, act === "up" ? -1 : 1);
+            render();
+          }
+          if (act === "delete") {
+            const it = req.items[i];
+            const ok = await confirmDialog({
+              title: "حذف البند",
+              message: `"${it.title}" بينحذف مع صوره، ولا يمكن التراجع.`,
+              confirmText: "حذف البند",
+              danger: true,
+            });
+            if (!ok) return;
+            await deleteItemCompletely(it.id);
+            req.items.splice(i, 1);
+            render();
+            showToast("حُذف البند");
+          }
+        }
+      } catch (err) {
+        showToast(adminErrorMessage(err));
+      }
+    }
+
+    (async () => {
+      const profile = await requireAuth({ adminOnly: true });
+      if (!profile) return;
+      renderShell("settings");
+      document.getElementById("crumb").insertAdjacentHTML("afterbegin", svgIcon("chevron", "icon-sm"));
+
+      const box = document.getElementById("reqBox");
+      if (!activityId) { box.innerHTML = `<div class="empty">النشاط غير موجود.</div>`; return; }
+
+      const viewBtn = document.getElementById("viewBtn");
+      viewBtn.href = `activity.html?id=${encodeURIComponent(activityId)}`;
+      viewBtn.innerHTML = svgIcon("book");
+
+      box.addEventListener("click", onClick);
+      try {
+        const [activity, reqs] = await Promise.all([fetchActivity(activityId), fetchRequirementsWithItems(activityId)]);
+        if (!activity) { box.innerHTML = `<div class="empty">ربما حُذف هذا النشاط. ارجع لقائمة الأنشطة.</div>`; return; }
+        document.getElementById("actName").textContent = activity.name;
+        document.title = `${activity.name} — إدارة — سند`;
+        requirements = reqs;
+        render();
+      } catch (e) {
+        box.innerHTML = `<div class="empty">تعذر تحميل البيانات. تحقق من الاتصال وأعد فتح الصفحة.</div>`;
+      }
+    })();
+  </script>
+</body>
+</html>

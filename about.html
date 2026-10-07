@@ -24,10 +24,7 @@
   <main class="page">
     <a class="breadcrumb" href="settings.html" id="crumb">الإعدادات</a>
     <h1 class="page-title" style="margin-bottom:20px">حول سند</h1>
-    <div class="card about-text">
-      <p>سند مرجع ميداني للمفتش: يجمع اشتراطات كل نشاط في مكان واحد، مرتبة على شكل اشتراطات وبنود، مع الملاحظات والصور التوضيحية لكل بند.</p>
-      <p>ابحث عن النشاط، افتح اشتراطاته، واحفظ البنود اللي ترجع لها كثير في المفضلة. والتوجيهات الجديدة من الإدارة تظهر في تبويب التوجيهات.</p>
-    </div>
+    <div class="empty" id="aboutBox">لا يوجد محتوى حاليًا</div>
   </main>
 
   <nav id="bottomNav"></nav>
@@ -38,19 +35,11 @@
   <script src="directives.js"></script>
   <script src="layout.js"></script>
   <script>
-    // صفحة عامة: تُعرض للزائر بدون شريط سفلي، وللمسجّل بالتنقل الكامل
     (async () => {
-      renderHeader();
+      const profile = await requireAuth();
+      if (!profile) return;
+      renderShell("settings");
       document.getElementById("crumb").insertAdjacentHTML("afterbegin", svgIcon("chevron", "icon-sm"));
-      const profile = await getCurrentProfile();
-      if (profile && !profile.is_disabled) {
-        renderBottomNav("settings");
-        updateDirectivesDot();
-      } else {
-        const crumb = document.getElementById("crumb");
-        crumb.href = "login.html";
-        crumb.lastChild.textContent = "تسجيل الدخول";
-      }
     })();
   </script>
 </body>
