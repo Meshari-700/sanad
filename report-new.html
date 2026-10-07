@@ -364,7 +364,7 @@
       $("pageTitle").textContent = tpl.title;
       document.title = `${tpl.title} — سند`;
       buildForm();
-      loadImage(tpl.image).catch(() => {}); // تحميل القالب مسبقًا
+      loadTemplateImage(tpl.image).catch(() => {}); // تحميل القالب مسبقًا
       $("previewBtn").addEventListener("click", preview);
 
       window.addEventListener("beforeunload", (e) => {

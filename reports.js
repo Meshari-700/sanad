@@ -24,6 +24,21 @@ function loadImage(src) {
   return _imgCache[src];
 }
 
+// صورة القالب: نجرب الاسم المحدد ثم البدائل الشائعة
+// (الآيفون أحيانًا يرفعها بامتداد jpeg بدل jpg، أو بدون بادئة template-)
+async function loadTemplateImage(src) {
+  const base = src.replace(/\.(jpe?g)$/i, "");
+  const plain = base.replace(/^template-/, "");
+  const candidates = [...new Set([
+    src, `${base}.jpeg`, `${base}.jpg`, `${base}.JPG`, `${base}.JPEG`,
+    `${plain}.jpg`, `${plain}.jpeg`, `templates/${plain}.jpg`,
+  ])];
+  for (const c of candidates) {
+    try { return await loadImage(c); } catch (e) { delete _imgCache[c]; }
+  }
+  throw new Error("تعذر تحميل صورة القالب");
+}
+
 async function ensureReportFont() {
   try {
     await Promise.all([
@@ -142,7 +157,7 @@ function makePainter(ctx) {
 // signatures: { key: dataURL }
 async function renderReportPages(tpl, data, signatures) {
   await ensureReportFont();
-  const bg = await loadImage(tpl.image);
+  const bg = await loadTemplateImage(tpl.image);
   const sigImgs = {};
   for (const [k, url] of Object.entries(signatures || {})) {
     if (url) sigImgs[k] = await loadImage(url);
