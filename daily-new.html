@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#126151" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="سند" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="apple-touch-icon" href="icon-180.png" />
+  <link rel="icon" href="icon.png" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://cttooytoziipdcasliah.supabase.co" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <title>تقرير الزيارات اليومية — سند</title>
+</head>
+<body>
+  <header id="appHeader"></header>
+
+  <main class="page">
+    <a class="breadcrumb" href="tool-daily.html" id="crumb">تقارير الزيارات اليومية</a>
+    <h1 class="page-title" style="margin-bottom:18px" id="pageTitle">تقرير الزيارات اليومية</h1>
+
+    <section class="card form-section">
+      <div class="card-head">بيانات التقرير</div>
+      <div class="field"><label for="name">الاسم</label><input id="name" type="text" maxlength="80" /></div>
+      <div class="field"><label for="date">التاريخ</label><input id="date" type="date" /></div>
+      <div class="field"><label for="muni">البلدية</label><select id="muni"><option value="">اختر البلدية</option></select></div>
+    </section>
+
+    <section class="card form-section">
+      <div class="card-head">نوع الرقابة</div>
+      <div id="types"></div>
+    </section>
+
+    <section class="card form-section">
+      <div class="card-head">الزيارات</div>
+      <div class="visits-total"><span>عدد الزيارات</span><strong id="visitsTotal">0</strong></div>
+      <div class="field-row-3" id="counts"></div>
+    </section>
+
+    <section class="card form-section">
+      <div class="card-head">أعداد أخرى</div>
+      <div id="extra"></div>
+    </section>
+
+    <section class="card form-section">
+      <div class="field"><label for="shortage">سبب النقص (إن وجد)</label><textarea id="shortage" rows="3" maxlength="1000"></textarea></div>
+      <div class="field"><label for="notes">ملاحظات</label><textarea id="notes" rows="3" maxlength="1500"></textarea></div>
+    </section>
+
+    <p class="msg error" id="formMsg" role="alert" style="margin-top:14px"></p>
+    <div class="sticky-actions">
+      <button class="btn block" id="saveBtn">حفظ التقرير</button>
+    </div>
+  </main>
+
+  <nav id="bottomNav"></nav>
+
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="utils.js"></script>
+  <script src="directives.js"></script>
+  <script src="layout.js"></script>
+  <script src="daily.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const editId = getParam("id");
+    let dirty = false;
+
+    function numField(f, cls = "") {
+      return `<div class="field ${cls}"><label for="n_${f.key}">${escapeHtml(f.label)}</label>
+        <input id="n_${f.key}" data-num="${f.key}" type="text" inputmode="numeric" maxlength="5" placeholder="0" /></div>`;
+    }
+
+    function num(key) {
+      const v = document.querySelector(`[data-num="${key}"]`).value;
+      return v ? Number(v) : 0;
+    }
+
+    function updateTotal() {
+      $("visitsTotal").textContent = DAILY_COUNTS.reduce((n, f) => n + num(f.key), 0);
+    }
+
+    function todayISO() {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    }
+
+    function fill(r) {
+      $("name").value = r.inspector_name || "";
+      $("date").value = r.report_date || "";
+      $("muni").value = r.municipality || "";
+      document.querySelectorAll("[data-type]").forEach((c) => (c.checked = (r.control_types || []).includes(c.dataset.type)));
+      [...DAILY_COUNTS, ...DAILY_EXTRA_COUNTS].forEach((f) => {
+        document.querySelector(`[data-num="${f.key}"]`).value = r[f.key] ? String(r[f.key]) : "";
+      });
+      $("shortage").value = r.shortage_reason || "";
+      $("notes").value = r.notes || "";
+      updateTotal();
+    }
+
+    function collect() {
+      const v = {
+        inspector_name: $("name").value.trim(),
+        report_date: $("date").value,
+        municipality: $("muni").value,
+        control_types: Array.from(document.querySelectorAll("[data-type]:checked")).map((c) => c.dataset.type),
+        shortage_reason: $("shortage").value.trim() || null,
+        notes: $("notes").value.trim() || null,
+      };
+      [...DAILY_COUNTS, ...DAILY_EXTRA_COUNTS].forEach((f) => (v[f.key] = num(f.key)));
+      return v;
+    }
+
+    function validate(v) {
+      if (!v.inspector_name) return "اكتب الاسم.";
+      if (!v.report_date) return "اختر التاريخ.";
+      if (!v.municipality) return "اختر البلدية.";
+      if (!v.control_types.length) return "اختر نوع الرقابة.";
+      return "";
+    }
+
+    async function save() {
+      const v = collect();
+      const problem = validate(v);
+      $("formMsg").textContent = problem;
+      if (problem) return;
+      $("saveBtn").disabled = true;
+      $("saveBtn").textContent = "جارٍ الحفظ...";
+      try {
+        await saveDailyReport(v, editId);
+        try { localStorage.setItem(LAST_MUNI_KEY, v.municipality); } catch (e) {}
+        dirty = false;
+        window.location.replace("tool-daily.html?saved=" + (editId ? "edit" : "new"));
+      } catch (e) {
+        const m = (e && e.message) || "";
+        $("formMsg").textContent = /fetch|network/i.test(m) ? "تعذر الاتصال، حاول مرة أخرى" : "تعذر حفظ التقرير، حاول مرة أخرى";
+        $("saveBtn").disabled = false;
+        $("saveBtn").textContent = editId ? "حفظ التعديل" : "حفظ التقرير";
+      }
+    }
+
+    (async () => {
+      const profile = await requireAuth();
+      if (!profile) return;
+      renderShell("tools");
+      $("crumb").insertAdjacentHTML("afterbegin", svgIcon("chevron", "icon-sm"));
+
+      $("muni").insertAdjacentHTML("beforeend", MUNICIPALITIES.map((m) => `<option value="${m}">${m}</option>`).join(""));
+      $("types").innerHTML = Object.entries(CONTROL_TYPES).map(([k, label]) => `
+        <label class="check-item" style="cursor:pointer">
+          <input type="checkbox" data-type="${k}" />
+          <span style="flex:1">${label}</span>
+        </label>`).join("");
+      $("counts").innerHTML = DAILY_COUNTS.map((f) => numField(f)).join("");
+      $("extra").innerHTML = `<div class="field-row-3">${DAILY_EXTRA_COUNTS.slice(0, 3).map((f) => numField(f)).join("")}</div>${numField(DAILY_EXTRA_COUNTS[3])}`;
+
+      document.querySelector("main").addEventListener("input", (e) => {
+        dirty = true;
+        if (e.target.dataset.num) {
+          e.target.value = e.target.value.replace(/[٠-٩]/g, (c) => "٠١٢٣٤٥٦٧٨٩".indexOf(c)).replace(/\D/g, "").replace(/^0+(?=\d)/, "");
+          updateTotal();
+        }
+      });
+      document.querySelector("main").addEventListener("change", () => { dirty = true; });
+      $("saveBtn").addEventListener("click", save);
+      window.addEventListener("beforeunload", (e) => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
+
+      if (editId) {
+        $("pageTitle").textContent = "تعديل التقرير";
+        $("saveBtn").textContent = "حفظ التعديل";
+        try {
+          const r = await fetchDailyReport(editId);
+          if (!r || r.created_by !== profile.id) {
+            $("formMsg").textContent = "لا يمكنك تعديل هذا التقرير.";
+            $("saveBtn").disabled = true;
+            return;
+          }
+          fill(r);
+        } catch (e) {
+          $("formMsg").textContent = "تعذر التحميل، تحقق من الاتصال";
+          $("saveBtn").disabled = true;
+        }
+      } else {
+        $("name").value = profile.full_name || "";
+        $("date").value = todayISO();
+        try { const last = localStorage.getItem(LAST_MUNI_KEY); if (last && MUNICIPALITIES.includes(last)) $("muni").value = last; } catch (e) {}
+      }
+    })();
+  </script>
+</body>
+</html>

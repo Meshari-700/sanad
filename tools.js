@@ -10,6 +10,7 @@ const TOOL_IMAGES_BUCKET = "tool-images";
 const BUILTIN_TOOLS = {
   reports: { page: "tool-reports.html", label: "المحاضر" },
   closures: { page: "tool-closures.html", label: "إجراء إغلاق منشأة" },
+  daily: { page: "tool-daily.html", label: "تقرير الزيارات اليومية" },
 };
 
 async function fetchTools() {

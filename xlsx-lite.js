@@ -4,7 +4,8 @@
 //
 // const blob = await buildXlsx({
 //   sheetName, columns: [{ header, width }],
-//   rows: [{ cells: [value | { text, link }], image?: { col, data: Uint8Array, w, h } }],
+//   sheets: [{ name, columns, rows, rowHeight }]  ← عدة أوراق (أو sheetName/columns/rows لورقة وحدة)
+//   rows: [{ cells: [value | { text, link }], image?: { col, data: Uint8Array, w, h }, height?, total? }],
 //   rowHeight,  // نقطة
 // });
 // ==================================================================
@@ -120,8 +121,10 @@ async function buildZip(files) {
 // ---------------------------------------------------------------
 // بناء ملف الإكسل
 // ---------------------------------------------------------------
-async function buildXlsx({ sheetName = "Sheet1", columns, rows, rowHeight = 18, headerColor = "FF126151" }) {
-  const EMU_PER_PX = 9525;
+const EMU_PER_PX = 9525;
+
+// أجزاء ورقة وحدة. n = رقم الورقة، imgStart = أول رقم صورة بالملف
+function buildSheetParts({ columns, rows, rowHeight = 18 }, n, imgStart) {
   const hyperlinks = [];
   const images = [];
   const rowXml = [];
@@ -135,16 +138,17 @@ async function buildXlsx({ sheetName = "Sheet1", columns, rows, rowHeight = 18, 
 
   rows.forEach((row, ri) => {
     const r = ri + 2;
+    const st = row.total ? 4 : 2; // صف المجاميع: عريض بخلفية فاتحة
     const cells = row.cells.map((v, ci) => {
       const ref = `${colName(ci)}${r}`;
       if (v && typeof v === "object" && v.link) {
         hyperlinks.push({ ref, link: v.link });
         return `<c r="${ref}" s="3" t="inlineStr"><is><t>${xmlEsc(v.text)}</t></is></c>`;
       }
-      if (typeof v === "number") return `<c r="${ref}" s="2"><v>${v}</v></c>`;
-      return `<c r="${ref}" s="2" t="inlineStr"><is><t xml:space="preserve">${xmlEsc(v ?? "")}</t></is></c>`;
+      if (typeof v === "number") return `<c r="${ref}" s="${st}"><v>${v}</v></c>`;
+      return `<c r="${ref}" s="${st}" t="inlineStr"><is><t xml:space="preserve">${xmlEsc(v ?? "")}</t></is></c>`;
     });
-    rowXml.push(`<row r="${r}" ht="${rowHeight}" customHeight="1">${cells.join("")}</row>`);
+    rowXml.push(`<row r="${r}" ht="${row.height || rowHeight}" customHeight="1">${cells.join("")}</row>`);
     if (row.image) images.push({ ...row.image, row: r - 1 });
   });
 
@@ -168,7 +172,7 @@ async function buildXlsx({ sheetName = "Sheet1", columns, rows, rowHeight = 18, 
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
     `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
     hyperlinks.map((h, i) => `<Relationship Id="rIdH${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="${xmlEsc(h.link)}" TargetMode="External"/>`).join("") +
-    (images.length ? `<Relationship Id="rIdD1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/>` : "") +
+    (images.length ? `<Relationship Id="rIdD1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing${n}.xml"/>` : "") +
     `</Relationships>`;
 
   const drawingXml =
@@ -189,27 +193,52 @@ async function buildXlsx({ sheetName = "Sheet1", columns, rows, rowHeight = 18, 
   const drawingRels =
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
     `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
-    images.map((im, i) => `<Relationship Id="rIdI${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image${i + 1}.jpeg"/>`).join("") +
+    images.map((im, i) => `<Relationship Id="rIdI${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image${imgStart + i + 1}.jpeg"/>`).join("") +
     `</Relationships>`;
+
+  return { sheetXml, sheetRels, drawingXml, drawingRels, images };
+}
+
+// sheets: [{ name, columns, rows, rowHeight }] — أو ورقة وحدة بالشكل القديم
+async function buildXlsx({ sheets = null, sheetName = "Sheet1", columns, rows, rowHeight = 18, headerColor = "FF126151" }) {
+  const list = sheets || [{ name: sheetName, columns, rows, rowHeight }];
+  let imgCount = 0;
+  const parts = list.map((sh, i) => {
+    const p = buildSheetParts(sh, i + 1, imgCount);
+    imgCount += p.images.length;
+    return p;
+  });
+  // أسماء الأوراق: 31 حرف بدون رموز ممنوعة، وبدون تكرار
+  const used = new Set();
+  const names = list.map((sh, i) => {
+    let base = String(sh.name || `ورقة ${i + 1}`).replace(/[\[\]:*?\/\\]/g, " ").trim().slice(0, 31) || `ورقة ${i + 1}`;
+    let name = base, k = 2;
+    while (used.has(name)) name = `${base.slice(0, 27)} (${k++})`;
+    used.add(name);
+    return name;
+  });
 
   const stylesXml =
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
     `<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">` +
-    `<fonts count="3">` +
+    `<fonts count="4">` +
       `<font><sz val="11"/><name val="Arial"/></font>` +
       `<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Arial"/></font>` +
       `<font><u/><sz val="11"/><color rgb="FF0563C1"/><name val="Arial"/></font>` +
+      `<font><b/><sz val="11"/><color rgb="FF0D4C3F"/><name val="Arial"/></font>` +
     `</fonts>` +
-    `<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>` +
-      `<fill><patternFill patternType="solid"><fgColor rgb="${headerColor}"/><bgColor indexed="64"/></patternFill></fill></fills>` +
+    `<fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>` +
+      `<fill><patternFill patternType="solid"><fgColor rgb="${headerColor}"/><bgColor indexed="64"/></patternFill></fill>` +
+      `<fill><patternFill patternType="solid"><fgColor rgb="FFE4F1ED"/><bgColor indexed="64"/></patternFill></fill></fills>` +
     `<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border>` +
       `<border><left style="thin"><color rgb="FFD2DAD7"/></left><right style="thin"><color rgb="FFD2DAD7"/></right><top style="thin"><color rgb="FFD2DAD7"/></top><bottom style="thin"><color rgb="FFD2DAD7"/></bottom><diagonal/></border></borders>` +
     `<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>` +
-    `<cellXfs count="4">` +
+    `<cellXfs count="5">` +
       `<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>` +
       `<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>` +
       `<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>` +
       `<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>` +
+      `<xf numFmtId="0" fontId="3" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>` +
     `</cellXfs>` +
     `<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>` +
     `</styleSheet>`;
@@ -224,9 +253,9 @@ async function buildXlsx({ sheetName = "Sheet1", columns, rows, rowHeight = 18, 
         `<Default Extension="xml" ContentType="application/xml"/>` +
         `<Default Extension="jpeg" ContentType="image/jpeg"/>` +
         `<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>` +
-        `<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>` +
+        parts.map((p, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join("") +
         `<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>` +
-        (images.length ? `<Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>` : "") +
+        parts.map((p, i) => (p.images.length ? `<Override PartName="/xl/drawings/drawing${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>` : "")).join("") +
         `</Types>`,
     },
     {
@@ -243,7 +272,7 @@ async function buildXlsx({ sheetName = "Sheet1", columns, rows, rowHeight = 18, 
         `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
         `<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">` +
         `<bookViews><workbookView/></bookViews>` +
-        `<sheets><sheet name="${xmlEsc(sheetName).slice(0, 31)}" sheetId="1" r:id="rId1"/></sheets>` +
+        `<sheets>${names.map((nm, i) => `<sheet name="${xmlEsc(nm)}" sheetId="${i + 1}" r:id="rIdS${i + 1}"/>`).join("")}</sheets>` +
         `</workbook>`,
     },
     {
@@ -251,18 +280,21 @@ async function buildXlsx({ sheetName = "Sheet1", columns, rows, rowHeight = 18, 
       data:
         `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
         `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
-        `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>` +
-        `<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>` +
+        parts.map((p, i) => `<Relationship Id="rIdS${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join("") +
+        `<Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>` +
         `</Relationships>`,
     },
     { name: "xl/styles.xml", data: stylesXml },
-    { name: "xl/worksheets/sheet1.xml", data: sheetXml },
-    { name: "xl/worksheets/_rels/sheet1.xml.rels", data: sheetRels },
   ];
-  if (images.length) {
-    files.push({ name: "xl/drawings/drawing1.xml", data: drawingXml });
-    files.push({ name: "xl/drawings/_rels/drawing1.xml.rels", data: drawingRels });
-    images.forEach((im, i) => files.push({ name: `xl/media/image${i + 1}.jpeg`, data: im.data, store: true }));
-  }
+  let img = 0;
+  parts.forEach((p, i) => {
+    files.push({ name: `xl/worksheets/sheet${i + 1}.xml`, data: p.sheetXml });
+    files.push({ name: `xl/worksheets/_rels/sheet${i + 1}.xml.rels`, data: p.sheetRels });
+    if (p.images.length) {
+      files.push({ name: `xl/drawings/drawing${i + 1}.xml`, data: p.drawingXml });
+      files.push({ name: `xl/drawings/_rels/drawing${i + 1}.xml.rels`, data: p.drawingRels });
+      p.images.forEach((im) => files.push({ name: `xl/media/image${++img}.jpeg`, data: im.data, store: true }));
+    }
+  });
   return buildZip(files);
 }
