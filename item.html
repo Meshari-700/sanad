@@ -40,7 +40,7 @@
   <script>
     const itemId = getParam("id");
 
-    function render(item, canEdit) {
+    function render(item) {
       const req = item.requirement || {};
       const act = req.activity || {};
       const images = item.images || [];
@@ -59,9 +59,6 @@
               ${svgIcon("layers")}
               ${req.name ? `<span class="chip chip-green">${escapeHtml(req.name)}</span>` : ""}
               ${item.is_suspended ? `<span class="chip chip-muted">${svgIcon("pause", "icon-sm")}موقوف</span>` : ""}
-            </div>
-            <div class="detail-actions">
-              ${canEdit ? `<a class="icon-btn" href="admin-item.html?id=${encodeURIComponent(item.id)}" aria-label="تعديل البند">${svgIcon("edit")}</a>` : ""}
             </div>
           </div>
           <h1 class="detail-title">${escapeHtml(item.title)}</h1>
@@ -114,7 +111,7 @@
           box.innerHTML = `<div class="empty"><strong>البند غير موجود</strong></div>`;
           return;
         }
-        render(item, isAdminRole(profile));
+        render(item);
       } catch (e) {
         box.innerHTML = `<div class="empty">تعذر التحميل، تحقق من الاتصال</div>`;
       }

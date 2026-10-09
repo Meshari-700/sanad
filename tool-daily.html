@@ -43,7 +43,7 @@
     <div class="filter-row"><div id="fRange"></div></div>
 
     <div class="daily-summary hidden" id="summary"></div>
-    <button class="btn secondary block" id="exportBtn" style="margin-bottom:16px"></button>
+    <button class="btn secondary block hidden" id="exportBtn" style="margin-bottom:16px"></button>
 
     <div id="list"><div class="card skeleton" style="height:160px"></div></div>
   </main>
@@ -168,6 +168,7 @@
     }
 
     async function exportXlsx() {
+      if (!isAdmin) return;
       const btn = $("exportBtn");
       btn.disabled = true;
       btn.textContent = "جارٍ تجهيز الملف...";
@@ -214,7 +215,11 @@
       }
 
       ["fUser", "fMuni"].forEach((id) => $(id).addEventListener("change", load));
-      $("exportBtn").addEventListener("click", exportXlsx);
+      // التصدير للمشرف والمالك فقط
+      if (isAdmin) {
+        $("exportBtn").classList.remove("hidden");
+        $("exportBtn").addEventListener("click", exportXlsx);
+      }
       $("list").addEventListener("click", (e) => {
         const row = e.target.closest("[data-id]");
         if (row) openDetail(rows.find((r) => r.id === row.dataset.id));

@@ -47,8 +47,6 @@
         <div class="section-head">
           <span id="faqIcon"></span>
           <h2 class="section-title">الأسئلة الشائعة</h2>
-          <span class="spacer"></span>
-          <button class="icon-btn round primary hidden" id="faqAdd" aria-label="إضافة سؤال" style="width:44px;height:44px"></button>
         </div>
         <div id="faqBox"><div class="card skeleton" style="height:120px"></div></div>
       </section>
@@ -64,8 +62,6 @@
   <script src="layout.js"></script>
   <script src="content.js"></script>
   <script src="faqs.js"></script>
-  <script src="admin.js"></script>
-  <script src="admin-ui.js"></script>
   <script>
     let allActivities = [];
     function runSearch(q) {
@@ -94,7 +90,7 @@
       document.getElementById("featureIcon").innerHTML = svgIcon("grid");
       document.getElementById("featureChev").innerHTML = svgIcon("chevron");
       document.getElementById("faqIcon").outerHTML = svgIcon("help");
-      initFaqs(document.getElementById("faqBox"), document.getElementById("faqAdd"), isAdminRole(profile));
+      initFaqs(document.getElementById("faqBox"), null, false);
 
       document.getElementById("searchInput").addEventListener("input", debounce((e) => runSearch(e.target.value), 150));
 

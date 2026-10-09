@@ -16,22 +16,18 @@
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <title>الأدوات — سند</title>
+  <title>إدارة الأسئلة الشائعة — سند</title>
 </head>
 <body>
   <header id="appHeader"></header>
 
   <main class="page">
+    <a class="breadcrumb" href="admin.html" id="crumb">لوحة الإشراف</a>
     <div class="page-head">
-      <div>
-        <h1 class="page-title">الأدوات</h1>
-        <p class="page-sub" id="countLabel">&nbsp;</p>
-      </div>
+      <h1 class="page-title">الأسئلة الشائعة</h1>
+      <button class="icon-btn round primary" id="faqAdd" aria-label="إضافة سؤال"></button>
     </div>
-
-    <div id="toolsBox" aria-live="polite">
-      <div class="tile-grid"><div class="tile skeleton"></div><div class="tile skeleton"></div></div>
-    </div>
+    <div id="faqBox"><div class="card skeleton" style="height:160px"></div></div>
   </main>
 
   <nav id="bottomNav"></nav>
@@ -42,31 +38,16 @@
   <script src="directives.js"></script>
   <script src="layout.js"></script>
   <script src="content.js"></script>
-  <script src="tools.js"></script>
+  <script src="admin.js"></script>
+  <script src="admin-ui.js"></script>
+  <script src="faqs.js"></script>
   <script>
     (async () => {
-      const profile = await requireAuth();
+      const profile = await requireAuth({ adminOnly: true });
       if (!profile) return;
-      renderShell("tools");
-
-      const box = document.getElementById("toolsBox");
-      box.addEventListener("click", (e) => {
-        const t = e.target.closest("[data-unavailable]");
-        if (!t) return;
-        e.preventDefault();
-        showToast("الأداة غير متاحة حاليًا");
-      });
-
-      try {
-        const tools = await fetchTools();
-        const visibleCount = tools.filter((t) => !t.is_hidden).length;
-        document.getElementById("countLabel").textContent = `${visibleCount} أداة`;
-        box.innerHTML = tools.length
-          ? `<div class="tile-grid">${tools.map(toolTileHtml).join("")}</div>`
-          : `<div class="empty"><strong>لا توجد أدوات</strong></div>`;
-      } catch (e) {
-        box.innerHTML = `<div class="empty">تعذر التحميل، تحقق من الاتصال</div>`;
-      }
+      renderShell("settings");
+      document.getElementById("crumb").insertAdjacentHTML("afterbegin", svgIcon("chevron", "icon-sm"));
+      initFaqs(document.getElementById("faqBox"), document.getElementById("faqAdd"), true);
     })();
   </script>
 </body>
