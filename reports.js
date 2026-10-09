@@ -352,7 +352,7 @@ async function shareOrDownload(blob, fileName) {
   const file = new File([blob], fileName, { type: "application/pdf" });
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     try {
-      await navigator.share({ files: [file], title: fileName });
+      await navigator.share({ files: [file] }); // بدون title: الآيفون يحفظ العنوان كملف نصي إضافي
       return;
     } catch (e) {
       if (e && e.name === "AbortError") return; // المستخدم ألغى

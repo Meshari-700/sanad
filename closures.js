@@ -15,6 +15,7 @@ const VISIT_REASONS = {
 const CLOSURE_REASONS = {
   no_license: "لا يوجد ترخيص",
   license_suspended: "الرخصة موقوفة",
+  license_cancelled: "الرخصة ملغية",
 };
 
 function visitReasonText(c) {
@@ -245,7 +246,7 @@ async function shareOrDownloadFile(blob, fileName) {
   const file = new File([blob], fileName, { type: blob.type });
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     try {
-      await navigator.share({ files: [file], title: fileName });
+      await navigator.share({ files: [file] }); // بدون title: الآيفون يحفظ العنوان كملف نصي إضافي
       return;
     } catch (e) {
       if (e && e.name === "AbortError") return;
