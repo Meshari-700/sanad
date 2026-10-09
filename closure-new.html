@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#126151" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="سند" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="apple-touch-icon" href="icon-180.png" />
+  <link rel="icon" href="icon.png" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://cttooytoziipdcasliah.supabase.co" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <title>إجراء إغلاق منشأة — سند</title>
+</head>
+<body>
+  <header id="appHeader"></header>
+
+  <main class="page">
+    <a class="breadcrumb" href="tool-closures.html" id="crumb">إجراءات الإغلاق</a>
+    <h1 class="page-title" style="margin-bottom:18px">إجراء إغلاق منشأة</h1>
+
+    <section class="card form-section">
+      <div class="card-head">صورة الواجهة</div>
+      <div id="photoBox"></div>
+      <input type="file" id="photoInput" accept="image/*" capture="environment" class="hidden" />
+    </section>
+
+    <section class="card form-section">
+      <div class="card-head">موقع المنشأة</div>
+      <p class="section-note" id="locStatus">جارٍ تحديد الموقع...</p>
+      <div class="field">
+        <label for="locUrl">رابط الموقع (قوقل ماب)</label>
+        <input id="locUrl" type="url" inputmode="url" dir="ltr" placeholder="الصق رابط الموقع هنا" autocomplete="off" />
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button type="button" class="btn secondary" id="relocateBtn">تحديد موقعي الحالي</button>
+        <a class="btn secondary hidden" id="openMap" target="_blank" rel="noopener">فتح الخريطة</a>
+      </div>
+    </section>
+
+    <section class="card form-section">
+      <div class="card-head">بيانات الزيارة</div>
+      <div class="field">
+        <label for="visitNo">رقم الزيارة</label>
+        <div class="prefix-input"><span>INS-</span>
+          <input id="visitNo" type="text" inputmode="numeric" maxlength="30" autocomplete="off" /></div>
+      </div>
+      <div class="field">
+        <label for="licenseNo">رقم الرخصة (اختياري)</label>
+        <input id="licenseNo" type="text" inputmode="numeric" maxlength="40" />
+      </div>
+    </section>
+
+    <section class="card form-section">
+      <div class="card-head">سبب الزيارة</div>
+      <div id="visitReasons"></div>
+      <div class="field hidden" id="otherWrap" style="margin-top:10px">
+        <label for="otherReason">اكتب السبب</label>
+        <input id="otherReason" type="text" maxlength="200" />
+      </div>
+    </section>
+
+    <section class="card form-section">
+      <div class="card-head">سبب الإغلاق</div>
+      <div id="closureReasons"></div>
+    </section>
+
+    <p class="msg error" id="formMsg" role="alert" style="margin-top:14px"></p>
+    <div class="sticky-actions">
+      <button class="btn block" id="saveBtn">حفظ الإجراء</button>
+    </div>
+  </main>
+
+  <div class="sheet hidden" id="sheet"><div class="sheet-inner" id="sheetInner"></div></div>
+
+  <nav id="bottomNav"></nav>
+
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="utils.js"></script>
+  <script src="directives.js"></script>
+  <script src="layout.js"></script>
+  <script src="closures.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let photoFile = null;
+    let photoUrl = null;
+    let dirty = false;
+
+    function radioList(name, map) {
+      return Object.entries(map).map(([value, label]) => `
+        <label class="check-item" style="cursor:pointer">
+          <input type="radio" name="${name}" value="${value}" style="width:22px;height:22px;accent-color:var(--primary);flex-shrink:0;margin-top:2px" />
+          <span style="flex:1">${escapeHtml(label)}</span>
+        </label>`).join("");
+    }
+
+    function drawPhoto() {
+      $("photoBox").innerHTML = photoFile
+        ? `<div class="photo-slot" style="aspect-ratio:4/3"><img src="${photoUrl}" alt="صورة الواجهة" /></div>
+           <button type="button" class="link-btn" id="changePhoto" style="margin-top:6px">تغيير الصورة</button>`
+        : `<button type="button" class="photo-add" id="addPhoto" style="width:100%;aspect-ratio:auto;height:150px">${svgIcon("camera")}التقاط صورة الواجهة</button>`;
+    }
+
+    // -------- الموقع --------
+    function setLocation(url, status) {
+      $("locUrl").value = url || "";
+      $("locStatus").textContent = status;
+      updateMapBtn();
+    }
+    function updateMapBtn() {
+      const url = extractUrl($("locUrl").value);
+      const ok = isMapsLink(url);
+      $("openMap").classList.toggle("hidden", !ok);
+      if (ok) $("openMap").href = url;
+    }
+    // تتبّع مستمر لين الحفظ، ونحتفظ بأدق قراءة (أو بالجديدة لو المفتش تحرّك فعلًا)
+    let watchId = null;
+    let best = null;
+    let manual = false;
+
+    function distanceM(a, b) {
+      const R = 6371000, toRad = (x) => (x * Math.PI) / 180;
+      const dLat = toRad(b.lat - a.lat), dLng = toRad(b.lng - a.lng);
+      const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+      return 2 * R * Math.asin(Math.sqrt(h));
+    }
+
+    function onPosition(pos) {
+      if (manual) return;
+      const p = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy };
+      const better = !best || p.accuracy <= best.accuracy;
+      const moved = best && distanceM(best, p) > best.accuracy + p.accuracy;
+      if (better || moved) {
+        best = p;
+        setLocation(mapsLink(p.lat, p.lng), "");
+      }
+      const acc = Math.round(best.accuracy);
+      $("locStatus").textContent = `يتم تحديث الموقع تلقائيًا لين الحفظ — الدقة الحالية ${acc} م${acc > 50 ? " (ضعيفة، انتظر شوي أو اطلع لمكان مكشوف)" : ""}.`;
+      $("locStatus").style.color = acc > 50 ? "var(--danger)" : "";
+    }
+
+    function onPositionError(e) {
+      if (manual || best) return; // عندنا موقع سابق صالح
+      $("locStatus").style.color = "";
+      $("locStatus").textContent = e && e.code === 1
+        ? "ما تم السماح بالوصول للموقع. الصق رابط الموقع من قوقل ماب، أو فعّل صلاحية الموقع واضغط تحديد موقعي الحالي."
+        : "تعذر تحديد الموقع. الصق رابط الموقع من قوقل ماب، أو اضغط تحديد موقعي الحالي.";
+    }
+
+    function stopWatching() {
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+    }
+
+    function startWatching() {
+      stopWatching();
+      manual = false;
+      best = null;
+      $("locStatus").style.color = "";
+      if (!navigator.geolocation) return onPositionError(null);
+      $("locStatus").textContent = "جارٍ تحديد الموقع...";
+      watchId = navigator.geolocation.watchPosition(onPosition, onPositionError, {
+        enableHighAccuracy: true, maximumAge: 0, timeout: 20000,
+      });
+    }
+
+    function collect() {
+      const visit = $("visitNo").value.trim();
+      const vr = document.querySelector('input[name="visit_reason"]:checked');
+      const cr = document.querySelector('input[name="closure_reason"]:checked');
+      return {
+        visit_number: visit ? "INS-" + visit : "",
+        license_number: $("licenseNo").value.trim() || null,
+        visit_reason: vr ? vr.value : "",
+        visit_reason_other: vr && vr.value === "other" ? $("otherReason").value.trim() || null : null,
+        closure_reason: cr ? cr.value : "",
+        location_url: extractUrl($("locUrl").value),
+      };
+    }
+
+    function validate(v) {
+      if (!photoFile) return "التقط صورة الواجهة.";
+      if (!v.location_url) return "حدد موقع المنشأة.";
+      if (!isMapsLink(v.location_url)) return "رابط الموقع لازم يكون من قوقل ماب.";
+      if (!v.visit_number) return "اكتب رقم الزيارة.";
+      if (!v.visit_reason) return "اختر سبب الزيارة.";
+      if (v.visit_reason === "other" && !v.visit_reason_other) return "اكتب سبب الزيارة.";
+      if (!v.closure_reason) return "اختر سبب الإغلاق.";
+      return "";
+    }
+
+    async function save() {
+      const v = collect();
+      const problem = validate(v);
+      $("formMsg").textContent = problem;
+      if (problem) return;
+      $("saveBtn").disabled = true;
+      $("saveBtn").textContent = "جارٍ الحفظ...";
+      try {
+        await saveClosure(v, photoFile);
+        stopWatching();
+        dirty = false;
+        $("sheetInner").innerHTML = `
+          <div class="center">
+            <div class="done-mark">${svgIcon("check")}</div>
+            <h2>تم حفظ الإجراء</h2>
+            <p class="page-sub" style="margin:0 0 6px">${escapeHtml(v.visit_number)}</p>
+          </div>
+          <div class="sheet-actions">
+            <a class="btn block" href="closure-new.html">إجراء جديد</a>
+            <a class="btn secondary block" href="tool-closures.html">إجراءات الإغلاق</a>
+          </div>`;
+        $("sheet").classList.remove("hidden");
+        document.body.style.overflow = "hidden";
+      } catch (e) {
+        const m = (e && e.message) || "";
+        $("formMsg").textContent = /fetch|network/i.test(m) ? "تعذر الاتصال، حاول مرة ثانية" : "تعذر حفظ الإجراء، حاول مرة ثانية";
+        $("saveBtn").disabled = false;
+        $("saveBtn").textContent = "حفظ الإجراء";
+      }
+    }
+
+    (async () => {
+      const profile = await requireAuth();
+      if (!profile) return;
+      renderShell("tools");
+      $("crumb").insertAdjacentHTML("afterbegin", svgIcon("chevron", "icon-sm"));
+
+      $("visitReasons").innerHTML = radioList("visit_reason", VISIT_REASONS);
+      $("closureReasons").innerHTML = radioList("closure_reason", CLOSURE_REASONS);
+      drawPhoto();
+
+      $("photoBox").addEventListener("click", (e) => {
+        if (e.target.closest("#addPhoto, #changePhoto")) $("photoInput").click();
+      });
+      $("photoInput").addEventListener("change", () => {
+        const f = $("photoInput").files[0];
+        $("photoInput").value = "";
+        if (!f) return;
+        if (photoUrl) URL.revokeObjectURL(photoUrl);
+        photoFile = f;
+        photoUrl = URL.createObjectURL(f);
+        dirty = true;
+        drawPhoto();
+      });
+
+      $("visitReasons").addEventListener("change", () => {
+        const other = document.querySelector('input[name="visit_reason"]:checked')?.value === "other";
+        $("otherWrap").classList.toggle("hidden", !other);
+        if (other) $("otherReason").focus();
+      });
+
+      $("visitNo").addEventListener("input", (e) => {
+        e.target.value = e.target.value.replace(/[٠-٩]/g, (c) => "٠١٢٣٤٥٦٧٨٩".indexOf(c)).replace(/\D/g, "");
+      });
+      $("locUrl").addEventListener("input", () => {
+        manual = true;
+        stopWatching();
+        $("locStatus").style.color = "";
+        $("locStatus").textContent = isMapsLink(extractUrl($("locUrl").value)) ? "تم اعتماد الرابط الملصوق، والتحديث التلقائي متوقف." : "الصق رابط موقع من قوقل ماب.";
+        updateMapBtn();
+      });
+      $("relocateBtn").addEventListener("click", startWatching);
+      window.addEventListener("pagehide", stopWatching);
+      document.querySelector("main").addEventListener("input", () => { dirty = true; });
+      $("saveBtn").addEventListener("click", save);
+      window.addEventListener("beforeunload", (e) => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
+
+      startWatching();
+    })();
+  </script>
+</body>
+</html>

@@ -1004,3 +1004,18 @@ a { color: inherit; text-decoration: none; }
 }
 
 .directive-photos { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 12px; }
+
+/* فلتر الفترة */
+.date-filter {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0 10px;
+}
+.date-filter span { color: var(--text-muted); font-size: 14px; flex-shrink: 0; }
+.date-filter input { flex: 1; min-width: 0; border: 0; background: none; padding: 10px 0; font-size: 15px; outline: 0; }

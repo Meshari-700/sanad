@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#126151" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="سند" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="apple-touch-icon" href="icon-180.png" />
+  <link rel="icon" href="icon.png" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://cttooytoziipdcasliah.supabase.co" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <title>إجراءات الإغلاق — سند</title>
+</head>
+<body>
+  <header id="appHeader"></header>
+
+  <main class="page">
+    <a class="breadcrumb" href="tools.html" id="crumb">الأدوات</a>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">إجراءات الإغلاق</h1>
+        <p class="page-sub" id="count">&nbsp;</p>
+      </div>
+      <a class="icon-btn round primary" href="closure-new.html" id="newBtn" aria-label="إجراء جديد"></a>
+    </div>
+
+    <div class="filter-row hidden" id="userFilter">
+      <select id="fUser" aria-label="عرض إجراءات">
+        <option value="mine" selected>إجراءاتي</option>
+        <option value="all">جميع الإجراءات</option>
+      </select>
+    </div>
+    <div class="filter-row">
+      <label class="date-filter"><span>من</span><input type="date" id="fFrom" /></label>
+      <label class="date-filter"><span>إلى</span><input type="date" id="fTo" /></label>
+    </div>
+    <button class="btn secondary block" id="exportBtn" style="margin-bottom:16px"></button>
+
+    <div id="list"><div class="card skeleton" style="height:160px"></div></div>
+  </main>
+
+  <nav id="bottomNav"></nav>
+
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="utils.js"></script>
+  <script src="directives.js"></script>
+  <script src="layout.js"></script>
+  <script src="xlsx-lite.js"></script>
+  <script src="closures.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let profile = null;
+    let isAdmin = false;
+    let rows = [];
+    let loadSeq = 0;
+
+    function currentFilters() {
+      const fu = isAdmin ? $("fUser").value : "mine";
+      return {
+        userId: fu === "mine" ? profile.id : fu === "all" ? null : fu,
+        from: $("fFrom").value || null,
+        to: $("fTo").value || null,
+        showAuthor: isAdmin && fu === "all",
+      };
+    }
+
+    function authorName(r) {
+      return (r.author && (r.author.full_name || r.author.email)) || "";
+    }
+
+    function render(f) {
+      $("count").textContent = `${rows.length} إجراء`;
+      $("exportBtn").disabled = !rows.length;
+      const list = $("list");
+      if (!rows.length) {
+        list.innerHTML = `<div class="empty"><strong>لا توجد إجراءات</strong></div>`;
+        return;
+      }
+      list.innerHTML = `<div class="card list-card">${rows.map((r) => {
+        const sub = [formatDateTime(r.created_at), CLOSURE_REASONS[r.closure_reason]];
+        if (f.showAuthor) sub.push(authorName(r));
+        return `
+          <button class="list-row" data-id="${r.id}">
+            ${svgIcon("shield")}
+            <span class="grow">
+              <span class="row-title" style="display:block;direction:ltr;text-align:right">${escapeHtml(r.visit_number)}</span>
+              <span class="row-sub" style="display:block">${escapeHtml(sub.filter(Boolean).join("، "))}</span>
+            </span>
+            ${svgIcon("chevron", "icon-sm chev")}
+          </button>`;
+      }).join("")}</div>`;
+    }
+
+    async function load() {
+      const seq = ++loadSeq;
+      const f = currentFilters();
+      $("list").innerHTML = `<div class="card skeleton" style="height:160px"></div>`;
+      try {
+        const data = await fetchClosures(f);
+        if (seq !== loadSeq) return;
+        rows = data;
+        render(f);
+      } catch (e) {
+        if (seq === loadSeq) $("list").innerHTML = `<div class="empty">تعذر التحميل، تحقق من الاتصال</div>`;
+      }
+    }
+
+    async function openDetail(r) {
+      const overlay = document.createElement("div");
+      overlay.className = "modal-overlay";
+      overlay.innerHTML = `
+        <div class="modal-box" role="dialog" aria-modal="true">
+          <h3 style="direction:ltr;text-align:right">${escapeHtml(r.visit_number)}</h3>
+          <p>${escapeHtml(formatDateTime(r.created_at))}${isAdmin ? "، " + escapeHtml(authorName(r)) : ""}</p>
+          <button class="photo-slot" data-photo style="width:100%;aspect-ratio:4/3;border:0;padding:0;margin-bottom:14px;cursor:zoom-in"><span class="loading" style="display:grid;place-items:center;height:100%">جارٍ تحميل الصورة...</span></button>
+          <div class="card info-list" style="margin-bottom:16px">
+            <div class="info-row"><span class="info-label">رقم الرخصة</span><span class="info-value">${escapeHtml(r.license_number || "—")}</span></div>
+            <div class="info-row"><span class="info-label">سبب الزيارة</span><span class="info-value">${escapeHtml(visitReasonText(r))}</span></div>
+            <div class="info-row"><span class="info-label">سبب الإغلاق</span><span class="info-value">${escapeHtml(CLOSURE_REASONS[r.closure_reason] || "")}</span></div>
+          </div>
+          <div class="sheet-actions" style="margin-top:0">
+            ${r.location_url ? `<a class="btn block" href="${escapeHtml(r.location_url)}" target="_blank" rel="noopener">فتح الموقع</a>` : ""}
+            ${isAdmin ? `<button class="btn secondary block" data-delete style="color:var(--danger)">حذف الإجراء</button>` : ""}
+            <button class="btn secondary block" data-close>إغلاق</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+      const close = () => overlay.remove();
+      overlay.querySelector("[data-close]").addEventListener("click", close);
+      overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+
+      const photo = overlay.querySelector("[data-photo]");
+      try {
+        const url = await closurePhotoUrl(r.photo_path);
+        photo.innerHTML = `<img src="${escapeHtml(url)}" alt="صورة الواجهة" />`;
+        photo.addEventListener("click", () => openLightbox(url));
+      } catch (e) {
+        photo.innerHTML = `<span class="loading" style="display:grid;place-items:center;height:100%">تعذر تحميل الصورة</span>`;
+      }
+
+      overlay.querySelector("[data-delete]")?.addEventListener("click", async () => {
+        close();
+        const ok = await confirmDialog({ title: "حذف الإجراء", message: "بينحذف الإجراء وصورته نهائيًا.", confirmText: "حذف الإجراء", danger: true, typedWord: "حذف" });
+        if (!ok) return;
+        try {
+          await deleteClosure(r);
+          rows = rows.filter((x) => x.id !== r.id);
+          render(currentFilters());
+          showToast("حُذف الإجراء");
+        } catch (e) {
+          showToast("تعذر حذف الإجراء");
+        }
+      });
+    }
+
+    async function exportXlsx() {
+      const btn = $("exportBtn");
+      btn.disabled = true;
+      btn.textContent = "جارٍ تجهيز الملف...";
+      try {
+        const blob = await exportClosuresXlsx(rows, (i, n) => { btn.textContent = `جارٍ تجهيز الملف ${i}/${n}`; });
+        const f = currentFilters();
+        const parts = ["إجراءات الإغلاق"];
+        if (f.from || f.to) parts.push(`${f.from || ""}_${f.to || ""}`);
+        else parts.push(todayStr());
+        await shareOrDownloadFile(blob, parts.join(" ") + ".xlsx");
+      } catch (e) {
+        showToast("تعذر تجهيز ملف الإكسل");
+      } finally {
+        btn.disabled = !rows.length;
+        btn.innerHTML = `${svgIcon("share", "icon-sm")}تحميل إكسل`;
+      }
+    }
+
+    function todayStr() {
+      const d = new Date();
+      return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+    }
+
+    (async () => {
+      profile = await requireAuth();
+      if (!profile) return;
+      isAdmin = isAdminRole(profile);
+      renderShell("tools");
+      $("crumb").insertAdjacentHTML("afterbegin", svgIcon("chevron", "icon-sm"));
+      $("newBtn").innerHTML = svgIcon("plus");
+      $("exportBtn").innerHTML = `${svgIcon("share", "icon-sm")}تحميل إكسل`;
+
+      if (isAdmin) {
+        $("userFilter").classList.remove("hidden");
+        try {
+          const { data } = await supabaseClient.from("profiles").select("id, full_name, email").order("full_name");
+          $("fUser").insertAdjacentHTML("beforeend", (data || [])
+            .filter((u) => u.id !== profile.id)
+            .map((u) => `<option value="${u.id}">${escapeHtml(u.full_name || u.email || "بدون اسم")}</option>`).join(""));
+        } catch (e) { /* القائمة تشتغل بدون الأسماء */ }
+      }
+
+      ["fUser", "fFrom", "fTo"].forEach((id) => $(id).addEventListener("change", load));
+      $("exportBtn").addEventListener("click", exportXlsx);
+      $("list").addEventListener("click", (e) => {
+        const row = e.target.closest("[data-id]");
+        if (row) openDetail(rows.find((r) => r.id === row.dataset.id));
+      });
+
+      load();
+    })();
+  </script>
+</body>
+</html>

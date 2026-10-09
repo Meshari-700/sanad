@@ -9,6 +9,7 @@ const TOOL_IMAGES_BUCKET = "tool-images";
 // كل أداة نبنيها تنضاف هنا
 const BUILTIN_TOOLS = {
   reports: { page: "tool-reports.html", label: "المحاضر" },
+  closures: { page: "tool-closures.html", label: "إجراء إغلاق منشأة" },
 };
 
 async function fetchTools() {
