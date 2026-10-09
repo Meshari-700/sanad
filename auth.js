@@ -30,6 +30,22 @@ async function signup(email, password, fullName) {
   return data;
 }
 
+// رابط الاستعادة يرجع لصفحة تعيين كلمة المرور
+async function requestPasswordReset(email) {
+  const redirectTo = new URL("reset-password.html", window.location.href).href;
+  const { error } = await supabaseClient.auth.resetPasswordForEmail(email, { redirectTo });
+  if (error) throw error;
+}
+
+// احتياط: لو رابط الاستعادة فتح أي صفحة ثانية، نوجهه لصفحة تعيين كلمة المرور
+if (typeof supabaseClient !== "undefined" && supabaseClient.auth && supabaseClient.auth.onAuthStateChange) {
+  supabaseClient.auth.onAuthStateChange((event) => {
+    if (event === "PASSWORD_RECOVERY" && !/reset-password\.html$/.test(window.location.pathname)) {
+      window.location.replace("reset-password.html");
+    }
+  });
+}
+
 async function logout() {
   sessionStorage.removeItem(PROFILE_CACHE_KEY);
   await supabaseClient.auth.signOut();
