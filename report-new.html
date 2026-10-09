@@ -242,7 +242,7 @@
         const [y, m, d] = v.split("-").map(Number);
         const day = new Date(y, m - 1, d, 12).getDay();
         const names = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
-        el.textContent = day === 6 ? "السبت (ما له خانة في المحضر)" : names[day];
+        el.textContent = day === 6 ? "السبت (لا توجد له خانة في المحضر)" : names[day];
       });
     }
 
@@ -395,7 +395,7 @@
           </div>`);
         $("shareBtn").addEventListener("click", () => shareOrDownload(savedBlob, reportFileName(tpl, current.data)));
       } catch (e) {
-        $("saveMsg").textContent = /fetch|network/i.test(e.message || "") ? "تعذر الاتصال، حاول مرة ثانية" : "تعذر حفظ المحضر، حاول مرة ثانية";
+        $("saveMsg").textContent = /fetch|network/i.test(e.message || "") ? "تعذر الاتصال، حاول مرة أخرى" : "تعذر حفظ المحضر، حاول مرة أخرى";
         btn.disabled = false;
         $("backBtn").disabled = false;
         btn.textContent = "حفظ المحضر";

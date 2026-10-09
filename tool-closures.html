@@ -148,7 +148,7 @@
 
       overlay.querySelector("[data-delete]")?.addEventListener("click", async () => {
         close();
-        const ok = await confirmDialog({ title: "حذف الإجراء", message: "بينحذف الإجراء وصورته نهائيًا.", confirmText: "حذف الإجراء", danger: true, typedWord: "حذف" });
+        const ok = await confirmDialog({ title: "حذف الإجراء", message: "سيُحذف الإجراء وصورته نهائيًا.", confirmText: "حذف الإجراء", danger: true, typedWord: "حذف" });
         if (!ok) return;
         try {
           await deleteClosure(r);

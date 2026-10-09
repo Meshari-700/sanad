@@ -56,7 +56,7 @@
       <div class="photo-edit" id="photoGrid"></div>
       <input type="file" id="photoInput" accept="image/*" multiple class="hidden" />
     </section>
-    <div class="empty hidden" id="photosLater" style="margin-top:16px">الصور تنضاف بعد حفظ البند</div>
+    <div class="empty hidden" id="photosLater" style="margin-top:16px">يمكن إضافة الصور بعد حفظ البند</div>
 
     <button class="btn block danger hidden" id="deleteBtn" style="margin-top:24px">حذف البند</button>
   </main>
@@ -132,7 +132,7 @@
         try {
           images.push(await uploadItemImage(item.id, file, nextSortOrder(images)));
         } catch (err) {
-          showToast(adminErrorMessage(err, "تعذر رفع الصورة. حاول مرة ثانية."));
+          showToast(adminErrorMessage(err, "تعذر رفع الصورة. حاول مرة أخرى."));
           break;
         }
       }
@@ -173,7 +173,7 @@
     async function remove() {
       const ok = await confirmDialog({
         title: "حذف البند",
-        message: "بينحذف مع صوره.",
+        message: "سيُحذف مع صوره.",
         confirmText: "حذف البند",
         danger: true,
       });

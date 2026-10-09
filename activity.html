@@ -58,7 +58,6 @@
   <script src="directives.js"></script>
   <script src="layout.js"></script>
   <script src="content.js"></script>
-  <script src="recent.js"></script>
   <script>
     const activityId = getParam("id");
     let requirements = [];
@@ -167,7 +166,6 @@
         document.getElementById("hero").innerHTML = `
           <span class="hero-icon">${renderEntityIcon(activity)}</span>
           <h1 class="hero-name">${escapeHtml(activity.name)}</h1>`;
-        pushRecentActivity(activity.id);
 
         requirements = reqs;
         const total = reqs.reduce((n, r) => n + r.items.length, 0);

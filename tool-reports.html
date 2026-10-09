@@ -155,7 +155,7 @@
       if (del) {
         del.addEventListener("click", async () => {
           close();
-          const ok = await confirmDialog({ title: "حذف المحضر", message: "بينحذف المحضر وملفه نهائيًا.", confirmText: "حذف المحضر", danger: true, typedWord: "حذف" });
+          const ok = await confirmDialog({ title: "حذف المحضر", message: "سيُحذف المحضر وملفه نهائيًا.", confirmText: "حذف المحضر", danger: true, typedWord: "حذف" });
           if (!ok) return;
           try {
             await deleteReport(r);

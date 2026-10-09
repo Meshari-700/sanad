@@ -147,7 +147,7 @@
         try {
           if (btn.dataset.act === "edit" && (await directiveForm(d))) { render(); showToast("حُفظ التعديل"); }
           if (btn.dataset.act === "delete") {
-            const ok = await confirmDialog({ title: "حذف التوجيه", message: "بيختفي من عند الكل.", confirmText: "حذف التوجيه", danger: true });
+            const ok = await confirmDialog({ title: "حذف التوجيه", message: "سيختفي لدى جميع المستخدمين.", confirmText: "حذف التوجيه", danger: true });
             if (!ok) return;
             await deleteDirectiveCompletely(d);
             items = items.filter((x) => x.id !== d.id);

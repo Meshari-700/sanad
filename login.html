@@ -48,7 +48,7 @@
         <button class="btn block" id="submitBtn">دخول</button>
 
         <div class="center" style="margin-top:12px">
-          <button class="link-btn" id="toggleBtn">ما عندك حساب؟ أنشئ حسابًا</button>
+          <button class="link-btn" id="toggleBtn">ليس لديك حساب؟ أنشئ حسابًا</button>
         </div>
       </div>
     </div>
@@ -66,8 +66,8 @@
     getCurrentProfile().then((p) => { if (p && !p.is_disabled) window.location.href = "index.html"; });
 
     const MODES = {
-      login: { title: "تسجيل الدخول", submit: "دخول", toggle: "ما عندك حساب؟ أنشئ حسابًا" },
-      signup: { title: "إنشاء حساب", submit: "إنشاء الحساب", toggle: "عندك حساب؟ سجّل دخولك" },
+      login: { title: "تسجيل الدخول", submit: "دخول", toggle: "ليس لديك حساب؟ أنشئ حسابًا" },
+      signup: { title: "إنشاء حساب", submit: "إنشاء الحساب", toggle: "لديك حساب؟ سجّل دخولك" },
       reset: { title: "استعادة كلمة المرور", submit: "إرسال رابط الاستعادة", toggle: "رجوع لتسجيل الدخول" },
     };
 
@@ -93,10 +93,10 @@
       if (/invalid login credentials/i.test(m)) return "البريد أو كلمة المرور غير صحيحة.";
       if (/email not confirmed/i.test(m)) return "فعّل حسابك من رابط التأكيد المرسل لبريدك، ثم سجّل دخولك.";
       if (/already registered|already exists/i.test(m)) return "هذا البريد مسجّل مسبقًا. سجّل دخولك بدل إنشاء حساب.";
-      if (/security purposes|rate limit|too many/i.test(m)) return "انتظر دقيقة قبل المحاولة مرة ثانية.";
-      if (/password/i.test(m)) return "كلمة المرور لازم تكون 6 أحرف أو أكثر.";
-      if (/fetch|network/i.test(m)) return "تعذر الاتصال. تحقق من الإنترنت وحاول مرة ثانية.";
-      return "صار خطأ غير متوقع. حاول مرة ثانية.";
+      if (/security purposes|rate limit|too many/i.test(m)) return "انتظر دقيقة قبل المحاولة مرة أخرى.";
+      if (/password/i.test(m)) return "يجب ألا تقل كلمة المرور عن 6 أحرف.";
+      if (/fetch|network/i.test(m)) return "تعذر الاتصال. تحقق من الإنترنت وحاول مرة أخرى.";
+      return "حدث خطأ غير متوقع. حاول مرة أخرى.";
     }
 
     $("toggleBtn").addEventListener("click", () => setMode(mode === "login" ? "signup" : "login"));
@@ -119,7 +119,7 @@
       try {
         if (mode === "reset") {
           await requestPasswordReset(email);
-          showMsg("إذا كان البريد مسجّلًا، بيوصلك رابط الاستعادة خلال دقائق. تأكد من البريد غير المرغوب فيه.", "success");
+          showMsg("إذا كان البريد مسجّلًا، فسيصلك رابط الاستعادة خلال دقائق. تأكد من البريد غير المرغوب فيه.", "success");
         } else if (mode === "signup") {
           const data = await signup(email, password, fullName);
           if (data.session) {

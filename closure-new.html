@@ -35,7 +35,7 @@
       <div class="card-head">موقع المنشأة</div>
       <p class="section-note" id="locStatus">جارٍ تحديد الموقع...</p>
       <div class="field">
-        <label for="locUrl">رابط الموقع (قوقل ماب)</label>
+        <label for="locUrl">رابط الموقع (خرائط جوجل)</label>
         <input id="locUrl" type="url" inputmode="url" dir="ltr" placeholder="الصق رابط الموقع هنا" autocomplete="off" />
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
@@ -142,7 +142,7 @@
         setLocation(mapsLink(p.lat, p.lng), "");
       }
       const acc = Math.round(best.accuracy);
-      $("locStatus").textContent = `يتم تحديث الموقع تلقائيًا لين الحفظ — الدقة الحالية ${acc} م${acc > 50 ? " (ضعيفة، انتظر شوي أو اطلع لمكان مكشوف)" : ""}.`;
+      $("locStatus").textContent = `يُحدَّث الموقع تلقائيًا حتى الحفظ — الدقة الحالية ${acc} م${acc > 50 ? " (ضعيفة، انتظر قليلًا أو انتقل إلى مكان مكشوف)" : ""}.`;
       $("locStatus").style.color = acc > 50 ? "var(--danger)" : "";
     }
 
@@ -150,8 +150,8 @@
       if (manual || best) return; // عندنا موقع سابق صالح
       $("locStatus").style.color = "";
       $("locStatus").textContent = e && e.code === 1
-        ? "ما تم السماح بالوصول للموقع. الصق رابط الموقع من قوقل ماب، أو فعّل صلاحية الموقع واضغط تحديد موقعي الحالي."
-        : "تعذر تحديد الموقع. الصق رابط الموقع من قوقل ماب، أو اضغط تحديد موقعي الحالي.";
+        ? "لم يُسمح بالوصول إلى الموقع. الصق رابط الموقع من خرائط جوجل، أو فعّل صلاحية الموقع واضغط تحديد موقعي الحالي."
+        : "تعذر تحديد الموقع. الصق رابط الموقع من خرائط جوجل، أو اضغط تحديد موقعي الحالي.";
     }
 
     function stopWatching() {
@@ -188,7 +188,7 @@
     function validate(v) {
       if (!photoFile) return "التقط صورة الواجهة.";
       if (!v.location_url) return "حدد موقع المنشأة.";
-      if (!isMapsLink(v.location_url)) return "رابط الموقع لازم يكون من قوقل ماب.";
+      if (!isMapsLink(v.location_url)) return "يجب أن يكون رابط الموقع من خرائط جوجل.";
       if (!v.visit_number) return "اكتب رقم الزيارة.";
       if (!v.visit_reason) return "اختر سبب الزيارة.";
       if (v.visit_reason === "other" && !v.visit_reason_other) return "اكتب سبب الزيارة.";
@@ -221,7 +221,7 @@
         document.body.style.overflow = "hidden";
       } catch (e) {
         const m = (e && e.message) || "";
-        $("formMsg").textContent = /fetch|network/i.test(m) ? "تعذر الاتصال، حاول مرة ثانية" : "تعذر حفظ الإجراء، حاول مرة ثانية";
+        $("formMsg").textContent = /fetch|network/i.test(m) ? "تعذر الاتصال، حاول مرة أخرى" : "تعذر حفظ الإجراء، حاول مرة أخرى";
         $("saveBtn").disabled = false;
         $("saveBtn").textContent = "حفظ الإجراء";
       }
@@ -264,7 +264,7 @@
         manual = true;
         stopWatching();
         $("locStatus").style.color = "";
-        $("locStatus").textContent = isMapsLink(extractUrl($("locUrl").value)) ? "تم اعتماد الرابط الملصوق، والتحديث التلقائي متوقف." : "الصق رابط موقع من قوقل ماب.";
+        $("locStatus").textContent = isMapsLink(extractUrl($("locUrl").value)) ? "تم اعتماد الرابط الملصوق، والتحديث التلقائي متوقف." : "الصق رابط موقع من خرائط جوجل.";
         updateMapBtn();
       });
       $("relocateBtn").addEventListener("click", startWatching);

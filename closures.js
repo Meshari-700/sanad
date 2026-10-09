@@ -43,7 +43,7 @@ function formatDateTime(value) {
 }
 
 // -------------------------------------------------
-// الموقع: رابط قوقل ماب من GPS، أو رابط يلصقه المفتش
+// الموقع: رابط خرائط جوجل من GPS، أو رابط يلصقه المفتش
 // -------------------------------------------------
 function mapsLink(lat, lng) {
   return `https://maps.google.com/?q=${lat.toFixed(6)},${lng.toFixed(6)}`;
@@ -60,7 +60,7 @@ function getCurrentPosition() {
   });
 }
 
-// يقبل روابط قوقل ماب بأشكالها (maps.google.com، google.com/maps، maps.app.goo.gl، goo.gl/maps)
+// يقبل روابط خرائط جوجل بأشكالها (maps.google.com، google.com/maps، maps.app.goo.gl، goo.gl/maps)
 function isMapsLink(url) {
   return /^https?:\/\/((www\.|maps\.)?google\.[a-z.]+\/maps|maps\.google\.[a-z.]+|maps\.app\.goo\.gl|goo\.gl\/maps)/i.test(url || "");
 }
@@ -71,7 +71,7 @@ function coordsFromLink(url) {
   return m ? { lat: Number(m[1]), lng: Number(m[2]) } : null;
 }
 
-// يطلع الرابط من نص ملصوق (قوقل ماب أحيانًا يضيف اسم المكان قبل الرابط)
+// يطلع الرابط من نص ملصوق (خرائط جوجل أحيانًا يضيف اسم المكان قبل الرابط)
 function extractUrl(text) {
   const m = (text || "").match(/https?:\/\/\S+/);
   return m ? m[0] : (text || "").trim();

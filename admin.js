@@ -244,12 +244,12 @@ async function setUserDisabled(userId, disabled) {
 }
 
 // رسالة خطأ مفهومة من أخطاء Supabase
-function adminErrorMessage(e, fallback = "تعذر حفظ التغيير. تحقق من الاتصال وحاول مرة ثانية.") {
+function adminErrorMessage(e, fallback = "تعذر حفظ التغيير. تحقق من الاتصال وحاول مرة أخرى.") {
   const m = (e && e.message) || "";
   if (/3 صور/.test(m)) return "الحد الأقصى 3 صور للبند.";
   if (/duplicate key|tools_builtin_url_unique/i.test(m)) return "هذي الأداة مضافة من قبل.";
-  if (/row-level security|permission|غير مصرّح/i.test(m)) return "ما عندك صلاحية لهذا الإجراء.";
+  if (/row-level security|permission|غير مصرّح/i.test(m)) return "ليست لديك صلاحية لهذا الإجراء.";
   if (/لا يمكنك/.test(m)) return m;
-  if (/fetch|network/i.test(m)) return "تعذر الاتصال. تحقق من الإنترنت وحاول مرة ثانية.";
+  if (/fetch|network/i.test(m)) return "تعذر الاتصال. تحقق من الإنترنت وحاول مرة أخرى.";
   return fallback;
 }

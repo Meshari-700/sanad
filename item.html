@@ -37,11 +37,10 @@
   <script src="directives.js"></script>
   <script src="layout.js"></script>
   <script src="content.js"></script>
-  <script src="favorites.js"></script>
   <script>
     const itemId = getParam("id");
 
-    function render(item, fav, canEdit) {
+    function render(item, canEdit) {
       const req = item.requirement || {};
       const act = req.activity || {};
       const images = item.images || [];
@@ -63,7 +62,6 @@
             </div>
             <div class="detail-actions">
               ${canEdit ? `<a class="icon-btn" href="admin-item.html?id=${encodeURIComponent(item.id)}" aria-label="تعديل البند">${svgIcon("edit")}</a>` : ""}
-              <button class="icon-btn ${fav ? "is-on" : ""}" id="favBtn" aria-pressed="${fav}" aria-label="${fav ? "إزالة من المفضلة" : "إضافة للمفضلة"}">${svgIcon("star")}</button>
             </div>
           </div>
           <h1 class="detail-title">${escapeHtml(item.title)}</h1>
@@ -97,22 +95,6 @@
         b.addEventListener("click", () => openLightbox(b.dataset.src))
       );
 
-      const favBtn = document.getElementById("favBtn");
-      favBtn.addEventListener("click", async () => {
-        const on = favBtn.getAttribute("aria-pressed") === "true";
-        favBtn.disabled = true;
-        try {
-          on ? await removeFavorite(item.id) : await addFavorite(item.id);
-          favBtn.classList.toggle("is-on", !on);
-          favBtn.setAttribute("aria-pressed", String(!on));
-          favBtn.setAttribute("aria-label", !on ? "إزالة من المفضلة" : "إضافة للمفضلة");
-          showToast(!on ? "أُضيف البند للمفضلة" : "أُزيل البند من المفضلة");
-        } catch (e) {
-          showToast("تعذر تحديث المفضلة. حاول مرة ثانية.");
-        } finally {
-          favBtn.disabled = false;
-        }
-      });
     }
 
     (async () => {
@@ -127,12 +109,12 @@
         return;
       }
       try {
-        const [item, fav] = await Promise.all([fetchItem(itemId), isFavorite(itemId)]);
+        const item = await fetchItem(itemId);
         if (!item) {
           box.innerHTML = `<div class="empty"><strong>البند غير موجود</strong></div>`;
           return;
         }
-        render(item, fav, isAdminRole(profile));
+        render(item, isAdminRole(profile));
       } catch (e) {
         box.innerHTML = `<div class="empty">تعذر التحميل، تحقق من الاتصال</div>`;
       }

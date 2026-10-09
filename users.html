@@ -101,7 +101,7 @@
         if (newRole === "owner") {
           const ok = await confirmDialog({
             title: "تعيين مالك",
-            message: "بياخذ نفس صلاحياتك.",
+            message: "سيحصل على صلاحياتك نفسها.",
             confirmText: "تعيين مالك",
             danger: true,
           });
@@ -112,7 +112,7 @@
           await setUserRole(u.id, newRole);
           u.role = newRole;
           render(input.value);
-          showToast(`صار الدور: ${roleLabel(newRole)}`);
+          showToast(`تم تغيير الدور إلى: ${roleLabel(newRole)}`);
         } catch (err) {
           sel.value = u.role;
           showToast(adminErrorMessage(err));
@@ -129,7 +129,7 @@
         if (disable) {
           const ok = await confirmDialog({
             title: "تعطيل الحساب",
-            message: "ما بيقدر يدخل لين تفعّله.",
+            message: "لن يتمكن من الدخول حتى تعيد تفعيله.",
             confirmText: "تعطيل الحساب",
             danger: true,
           });

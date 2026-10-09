@@ -125,7 +125,7 @@
           if (act === "delete") {
             const ok = await confirmDialog({
               title: `حذف اشتراط "${req.name}"`,
-              message: "بينحذف مع بنوده.",
+              message: "سيُحذف مع بنوده.",
               confirmText: "حذف الاشتراط",
               danger: true,
               typedWord: req.items.length ? "حذف" : null,
@@ -145,7 +145,7 @@
             const it = req.items[i];
             const ok = await confirmDialog({
               title: "حذف البند",
-              message: "بينحذف مع صوره.",
+              message: "سيُحذف مع صوره.",
               confirmText: "حذف البند",
               danger: true,
             });

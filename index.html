@@ -44,13 +44,13 @@
       </a>
 
       <section class="section">
-        <div class="section-head" id="recentHead"></div>
-        <div id="recentBox"><div class="tile-grid"><div class="tile skeleton"></div><div class="tile skeleton"></div></div></div>
-      </section>
-
-      <section class="section">
-        <div class="section-head" id="favHead"></div>
-        <div id="favBox"><div class="card skeleton" style="height:120px"></div></div>
+        <div class="section-head">
+          <span id="faqIcon"></span>
+          <h2 class="section-title">الأسئلة الشائعة</h2>
+          <span class="spacer"></span>
+          <button class="icon-btn round primary hidden" id="faqAdd" aria-label="إضافة سؤال" style="width:44px;height:44px"></button>
+        </div>
+        <div id="faqBox"><div class="card skeleton" style="height:120px"></div></div>
       </section>
     </div>
   </main>
@@ -63,60 +63,11 @@
   <script src="directives.js"></script>
   <script src="layout.js"></script>
   <script src="content.js"></script>
-  <script src="favorites.js"></script>
-  <script src="recent.js"></script>
+  <script src="faqs.js"></script>
+  <script src="admin.js"></script>
+  <script src="admin-ui.js"></script>
   <script>
-    const FAV_PREVIEW = 5;
     let allActivities = [];
-
-    function sectionHead(icon, title, extra = "") {
-      return `${svgIcon(icon)}<h2 class="section-title">${title}</h2><span class="spacer"></span>${extra}`;
-    }
-
-    function renderRecent() {
-      const box = document.getElementById("recentBox");
-      const byId = new Map(allActivities.map((a) => [a.id, a]));
-      const ids = pruneRecentActivities(allActivities.map((a) => a.id));
-      const list = ids.map((id) => byId.get(id)).filter(Boolean);
-      if (!list.length) {
-        box.innerHTML = `<div class="empty"><strong>لا توجد أنشطة مفتوحة</strong></div>`;
-        return;
-      }
-      box.innerHTML = `<div class="tile-grid">${list.map(activityTileHtml).join("")}</div>`;
-    }
-
-    async function renderFavorites() {
-      const box = document.getElementById("favBox");
-      const head = document.getElementById("favHead");
-      try {
-        const favs = await fetchFavorites(FAV_PREVIEW + 1);
-        const more = favs.length > FAV_PREVIEW;
-        head.innerHTML = sectionHead("star", "المفضلة", more ? `<a class="section-link" href="favorites.html">عرض الكل</a>` : "");
-        if (!favs.length) {
-          box.innerHTML = `<div class="empty"><strong>لا توجد بنود في المفضلة</strong></div>`;
-          return;
-        }
-        box.innerHTML = `<div class="card list-card">${favs.slice(0, FAV_PREVIEW).map(favoriteRowHtml).join("")}</div>`;
-      } catch (e) {
-        box.innerHTML = `<div class="empty">تعذر التحميل، تحقق من الاتصال</div>`;
-      }
-    }
-
-    function favoriteRowHtml(f) {
-      const it = f.item;
-      const activity = it.requirement?.activity?.name || "";
-      const req = it.requirement?.name || "";
-      return `
-        <a class="list-row" href="item.html?id=${encodeURIComponent(it.id)}">
-          ${svgIcon("star", "icon fav-star")}
-          <span class="grow">
-            <span class="row-title" style="display:block">${escapeHtml(it.title)}</span>
-            <span class="row-sub" style="display:block">${escapeHtml(activity)}${req ? "، " + escapeHtml(req) : ""}</span>
-          </span>
-          ${svgIcon("chevron", "icon-sm chev")}
-        </a>`;
-    }
-
     function runSearch(q) {
       const results = document.getElementById("searchResults");
       const sections = document.getElementById("homeSections");
@@ -142,18 +93,14 @@
       document.getElementById("searchIcon").outerHTML = svgIcon("search");
       document.getElementById("featureIcon").innerHTML = svgIcon("grid");
       document.getElementById("featureChev").innerHTML = svgIcon("chevron");
-      document.getElementById("recentHead").innerHTML = sectionHead("clock", "آخر الأنشطة");
-      document.getElementById("favHead").innerHTML = sectionHead("star", "المفضلة");
+      document.getElementById("faqIcon").outerHTML = svgIcon("help");
+      initFaqs(document.getElementById("faqBox"), document.getElementById("faqAdd"), isAdminRole(profile));
 
       document.getElementById("searchInput").addEventListener("input", debounce((e) => runSearch(e.target.value), 150));
 
-      renderFavorites();
       try {
         allActivities = await fetchActivities();
-        renderRecent();
-      } catch (e) {
-        document.getElementById("recentBox").innerHTML = `<div class="empty">تعذر التحميل، تحقق من الاتصال</div>`;
-      }
+      } catch (e) { /* البحث يرجع فاضي لو فشل التحميل */ }
     })();
   </script>
 </body>

@@ -109,7 +109,7 @@
           const g = groups[i];
           const ok = await confirmDialog({
             title: `حذف مجموعة "${g.name}"`,
-            message: "أنشطتها ما تنحذف.",
+            message: "لن تُحذف أنشطتها.",
             confirmText: "حذف المجموعة",
             danger: true,
           });
@@ -203,7 +203,7 @@
           const a = list[i];
           const ok = await confirmDialog({
             title: `حذف نشاط "${a.name}"`,
-            message: "بينحذف مع كل محتواه.",
+            message: "سيُحذف مع كل محتواه.",
             confirmText: "حذف النشاط",
             danger: true,
             typedWord: "حذف",
