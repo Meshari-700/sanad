@@ -57,6 +57,10 @@ function formDialog({ title, fields, values = {}, submitText = "حفظ", onSubmi
             </div>
           </div>`;
         }
+        case "images":
+          return `<div class="field"><label>${escapeHtml(f.label)}</label>
+            <div class="photo-edit" data-images="${f.name}" style="grid-template-columns:repeat(${f.max || 2},minmax(0,1fr))"></div>
+            <input type="file" accept="image/*" multiple class="hidden" data-images-input="${f.name}" /></div>`;
         case "file":
           return `<div class="field"><label for="${id}">${escapeHtml(f.label)}</label>
             <input id="${id}" type="file" name="${f.name}" ${f.accept ? `accept="${escapeHtml(f.accept)}"` : ""} />
@@ -84,6 +88,36 @@ function formDialog({ title, fields, values = {}, submitText = "حفظ", onSubmi
     const box = overlay.querySelector(".modal-box");
     const msg = overlay.querySelector("[data-msg]");
     const ok = overlay.querySelector("[data-ok]");
+
+    // حقول الصور المتعددة: keep = مسارات موجودة، add = ملفات جديدة
+    const imgState = {};
+    for (const f of fields.filter((x) => x.type === "images")) {
+      const st = (imgState[f.name] = { max: f.max || 2, keep: (values[f.name] || []).slice(), add: [], urlOf: f.urlOf });
+      const grid = box.querySelector(`[data-images="${f.name}"]`);
+      const input = box.querySelector(`[data-images-input="${f.name}"]`);
+      const draw = () => {
+        const slots = [
+          ...st.keep.map((p, i) => `<div class="photo-slot"><img src="${escapeHtml(st.urlOf(p))}" alt="" /><button type="button" class="mini-btn danger" data-del-keep="${i}" aria-label="حذف الصورة">${svgIcon("trash")}</button></div>`),
+          ...st.add.map((a, i) => `<div class="photo-slot"><img src="${a.url}" alt="" /><button type="button" class="mini-btn danger" data-del-add="${i}" aria-label="حذف الصورة">${svgIcon("trash")}</button></div>`),
+        ];
+        if (st.keep.length + st.add.length < st.max) slots.push(`<button type="button" class="photo-add" data-add-img>${svgIcon("camera")}إضافة صورة</button>`);
+        grid.innerHTML = slots.join("");
+      };
+      grid.addEventListener("click", (e) => {
+        if (e.target.closest("[data-add-img]")) return input.click();
+        const k = e.target.closest("[data-del-keep]");
+        if (k) { st.keep.splice(Number(k.dataset.delKeep), 1); return draw(); }
+        const a = e.target.closest("[data-del-add]");
+        if (a) { URL.revokeObjectURL(st.add[Number(a.dataset.delAdd)].url); st.add.splice(Number(a.dataset.delAdd), 1); draw(); }
+      });
+      input.addEventListener("change", () => {
+        const room = st.max - st.keep.length - st.add.length;
+        Array.from(input.files).slice(0, room).forEach((file) => st.add.push({ file, url: URL.createObjectURL(file) }));
+        input.value = "";
+        draw();
+      });
+      draw();
+    }
 
     // إظهار/إخفاء الحقول المشروطة (showIf: { field, value })
     function applyShowIf() {
@@ -121,6 +155,9 @@ function formDialog({ title, fields, values = {}, submitText = "حفظ", onSubmi
       for (const f of fields) {
         if (f.type === "checkbox") {
           out[f.name] = box.querySelector(`[name="${f.name}"]`).checked;
+        } else if (f.type === "images") {
+          const st = imgState[f.name];
+          out[f.name] = { keep: st.keep.slice(), add: st.add.map((a) => a.file) };
         } else if (f.type === "file") {
           out[f.name] = box.querySelector(`[name="${f.name}"]`).files[0] || null;
         } else if (f.type === "icon") {

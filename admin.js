@@ -188,10 +188,25 @@ async function deleteToolCompletely(tool) {
 // -------------------------------------------------
 // التوجيهات
 // -------------------------------------------------
+async function uploadDirectiveImage(file) {
+  const compressed = await compressImage(file, 1280, 0.75);
+  const path = newFileName();
+  const { error } = await supabaseClient.storage
+    .from(DIRECTIVE_IMAGES_BUCKET)
+    .upload(path, compressed, { contentType: "image/jpeg" });
+  if (error) throw error;
+  return path;
+}
+
+async function deleteDirectiveCompletely(d) {
+  if (d.images && d.images.length) await removeStorageFiles(DIRECTIVE_IMAGES_BUCKET, d.images);
+  await deleteRow("directives", d.id);
+}
+
 async function fetchDirectivesWithReads() {
   const { data, error } = await supabaseClient
     .from("directives")
-    .select("id, title, content, created_at, directive_reads(count)")
+    .select("id, title, content, images, created_at, directive_reads(count)")
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data.map((d) => ({ ...d, reads: d.directive_reads?.[0]?.count ?? 0 }));

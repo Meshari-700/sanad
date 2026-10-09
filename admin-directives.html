@@ -60,16 +60,20 @@
             <span class="stat">قرأه ${d.reads} من ${activeUsers}</span>
           </div>
           <h2 class="directive-title">${escapeHtml(d.title)}</h2>
-          ${d.content ? `<p class="directive-body is-clamped">${escapeHtml(d.content)}</p>
-            <button class="more-btn hidden" data-more aria-expanded="false">المزيد</button>` : ""}
+          ${d.content ? `<p class="directive-body is-clamped">${escapeHtml(d.content)}</p>` : ""}
+          ${directivePhotosHtml(d)}
+          <button class="more-btn hidden" data-more aria-expanded="false">المزيد</button>
           <div class="row-actions" style="margin-top:14px">
             <button class="mini-btn" data-act="edit" data-i="${i}" aria-label="تعديل">${svgIcon("edit")}</button>
             <button class="mini-btn danger" data-act="delete" data-i="${i}" aria-label="حذف">${svgIcon("trash")}</button>
           </div>
         </article>`).join("");
-      list.querySelectorAll(".directive-body").forEach((b) => {
-        if (b.scrollHeight > b.clientHeight + 2) b.nextElementSibling.classList.remove("hidden");
-        else b.classList.remove("is-clamped");
+      list.querySelectorAll(".directive").forEach((card) => {
+        const b = card.querySelector(".directive-body");
+        const long = b && b.scrollHeight > b.clientHeight + 2;
+        if (b) b.dataset.long = long ? "1" : "";
+        if (b && !long) b.classList.remove("is-clamped");
+        if (long || card.querySelector(".directive-photos")) card.querySelector("[data-more]").classList.remove("hidden");
       });
     }
 
@@ -77,20 +81,37 @@
       return formDialog({
         title: d ? "تعديل التوجيه" : "توجيه جديد",
         submitText: d ? "حفظ التعديل" : "نشر",
-        values: d ? { title: d.title, content: d.content } : {},
+        values: d ? { title: d.title, content: d.content, images: d.images || [] } : {},
         fields: [
           { name: "title", label: "العنوان", type: "text", required: true, maxlength: 150 },
           { name: "content", label: "النص", type: "textarea", rows: 6, maxlength: 5000 },
+          { name: "images", label: "الصور (حتى صورتين)", type: "images", max: MAX_DIRECTIVE_IMAGES, urlOf: directiveImageUrl },
         ],
         onSubmit: async (v) => {
-          const values = { title: v.title, content: v.content || null };
-          if (d) {
-            await updateRow("directives", d.id, values);
-            Object.assign(d, values);
-          } else {
-            const row = await createRow("directives", values);
-            items.unshift({ ...row, reads: 0 });
+          // نرفع الجديد أولًا، وبعد نجاح الحفظ نحذف المشالة
+          const uploaded = [];
+          try {
+            for (const f of v.images.add) uploaded.push(await uploadDirectiveImage(f));
+          } catch (e) {
+            if (uploaded.length) await removeStorageFiles(DIRECTIVE_IMAGES_BUCKET, uploaded).catch(() => {});
+            throw e;
           }
+          const images = [...v.images.keep, ...uploaded];
+          const removed = d ? (d.images || []).filter((p) => !v.images.keep.includes(p)) : [];
+          const values = { title: v.title, content: v.content || null, images };
+          try {
+            if (d) {
+              await updateRow("directives", d.id, values);
+              Object.assign(d, values);
+            } else {
+              const row = await createRow("directives", values);
+              items.unshift({ ...row, reads: 0 });
+            }
+          } catch (e) {
+            if (uploaded.length) await removeStorageFiles(DIRECTIVE_IMAGES_BUCKET, uploaded).catch(() => {});
+            throw e;
+          }
+          if (removed.length) await removeStorageFiles(DIRECTIVE_IMAGES_BUCKET, removed).catch(() => {});
         },
       });
     }
@@ -107,10 +128,15 @@
       });
 
       document.getElementById("list").addEventListener("click", async (e) => {
+        const photo = e.target.closest(".directive-photos button");
+        if (photo) { openLightbox(photo.dataset.src); return; }
         const more = e.target.closest("[data-more]");
         if (more) {
-          const body = more.previousElementSibling;
-          const open = body.classList.toggle("is-clamped") === false;
+          const card = more.closest(".directive");
+          const open = more.getAttribute("aria-expanded") !== "true";
+          const body = card.querySelector(".directive-body");
+          if (body) body.classList.toggle("is-clamped", !open && body.dataset.long === "1");
+          card.querySelector(".directive-photos")?.classList.toggle("hidden", !open);
           more.textContent = open ? "عرض أقل" : "المزيد";
           more.setAttribute("aria-expanded", String(open));
           return;
@@ -123,7 +149,7 @@
           if (btn.dataset.act === "delete") {
             const ok = await confirmDialog({ title: "حذف التوجيه", message: "بيختفي من عند الكل.", confirmText: "حذف التوجيه", danger: true });
             if (!ok) return;
-            await deleteRow("directives", d.id);
+            await deleteDirectiveCompletely(d);
             items = items.filter((x) => x.id !== d.id);
             render();
             showToast("حُذف التوجيه");

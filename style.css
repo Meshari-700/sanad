@@ -1002,3 +1002,5 @@ a { color: inherit; text-decoration: none; }
   text-align: left;
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
 }
+
+.directive-photos { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 12px; }

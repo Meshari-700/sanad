@@ -2,10 +2,27 @@
 // directives.js — التوجيهات وتتبّع المقروء
 // ==================================================================
 
+const DIRECTIVE_IMAGES_BUCKET = "directive-images";
+const MAX_DIRECTIVE_IMAGES = 2;
+
+function directiveImageUrl(path) {
+  return publicFileUrl(DIRECTIVE_IMAGES_BUCKET, path);
+}
+
+// صور التوجيه (مخفية لين ينفتح التوجيه كامل)
+function directivePhotosHtml(d) {
+  const imgs = d.images || [];
+  if (!imgs.length) return "";
+  return `<div class="photo-row directive-photos hidden">${imgs.map((p) => {
+    const url = directiveImageUrl(p);
+    return `<button data-src="${escapeHtml(url)}" aria-label="عرض الصورة"><img src="${escapeHtml(url)}" alt="" loading="lazy" /></button>`;
+  }).join("")}</div>`;
+}
+
 async function fetchDirectives() {
   const { data, error } = await supabaseClient
     .from("directives")
-    .select("id, title, content, created_at")
+    .select("id, title, content, images, created_at")
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data;

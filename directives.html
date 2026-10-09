@@ -58,7 +58,9 @@
     function toggle(card, open) {
       const body = card.querySelector(".directive-body");
       const btn = card.querySelector(".more-btn");
-      body.classList.toggle("is-clamped", !open);
+      card.dataset.open = open ? "1" : "";
+      body?.classList.toggle("is-clamped", !open);
+      card.querySelector(".directive-photos")?.classList.toggle("hidden", !open);
       btn.textContent = open ? "عرض أقل" : "المزيد";
       btn.setAttribute("aria-expanded", String(open));
       if (open) markRead(card);
@@ -87,8 +89,9 @@
                 ${isNew ? `<span class="chip chip-gold">جديد</span>` : ""}
               </div>
               <h2 class="directive-title">${escapeHtml(d.title)}</h2>
-              ${d.content ? `<p class="directive-body is-clamped">${escapeHtml(d.content)}</p>
-                <button class="more-btn hidden" aria-expanded="false">المزيد</button>` : ""}
+              ${d.content ? `<p class="directive-body is-clamped">${escapeHtml(d.content)}</p>` : ""}
+              ${directivePhotosHtml(d)}
+              <button class="more-btn hidden" aria-expanded="false">المزيد</button>
             </article>`;
         }).join("");
 
@@ -98,7 +101,9 @@
         list.querySelectorAll(".directive").forEach((card) => {
           const body = card.querySelector(".directive-body");
           const long = body && body.scrollHeight > body.clientHeight + 2;
-          if (long) {
+          const hasPhotos = !!card.querySelector(".directive-photos");
+          if (long || hasPhotos) {
+            if (!long) body?.classList.remove("is-clamped");
             card.classList.add("is-expandable");
             card.querySelector(".more-btn").classList.remove("hidden");
           } else {
@@ -112,10 +117,11 @@
         }
 
         list.addEventListener("click", (e) => {
+          const photo = e.target.closest(".directive-photos button");
+          if (photo) { openLightbox(photo.dataset.src); return; }
           const card = e.target.closest(".directive.is-expandable");
           if (!card) return;
-          const open = card.querySelector(".directive-body").classList.contains("is-clamped");
-          toggle(card, open);
+          toggle(card, !card.dataset.open);
         });
       } catch (e) {
         list.innerHTML = `<div class="empty">تعذر التحميل، تحقق من الاتصال</div>`;
