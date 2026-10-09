@@ -38,7 +38,7 @@ const TPL_SEIZURE = {
         { type: "text", key: "shop_name", label: "اسم المنشأة", required: true },
         { type: "text", key: "cr_number", label: "رقم السجل التجاري", inputmode: "numeric" },
         { type: "text", key: "license_number", label: "رقم الرخصة", inputmode: "numeric" },
-        { type: "text", key: "visit_number", label: "رقم الزيارة", inputmode: "numeric" },
+        { type: "text", key: "visit_number", label: "رقم الزيارة", required: true, prefix: "INS-", digitsOnly: true },
         { type: "date", key: "visit_date", label: "تاريخ الزيارة", required: true, defaultToday: true },
         { type: "text", key: "district", label: "الحي" },
         { type: "text", key: "street", label: "الشارع" },

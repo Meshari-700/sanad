@@ -64,6 +64,11 @@
       const id = `f_${f.key}`;
       switch (f.type) {
         case "text":
+          if (f.prefix) {
+            return `<div class="field"><label for="${id}">${escapeHtml(f.label)}</label>
+              <div class="prefix-input"><span>${escapeHtml(f.prefix)}</span>
+              <input id="${id}" data-key="${f.key}" data-digits="${f.digitsOnly ? 1 : ""}" type="text" inputmode="numeric" maxlength="30" autocomplete="off" /></div></div>`;
+          }
           return `<div class="field"><label for="${id}">${escapeHtml(f.label)}</label>
             <input id="${id}" data-key="${f.key}" type="text" ${f.inputmode ? `inputmode="${f.inputmode}"` : ""} maxlength="200" /></div>`;
         case "date":
@@ -176,6 +181,7 @@
 
       form.addEventListener("input", (e) => {
         dirty = true;
+        if (e.target.dataset.digits) e.target.value = e.target.value.replace(/[٠-٩]/g, (c) => "٠١٢٣٤٥٦٧٨٩".indexOf(c)).replace(/\D/g, "");
         if (e.target.type === "date") updateHijriHints();
       });
 
@@ -249,7 +255,8 @@
       const allFields = tpl.sections.flatMap((s) => s.fields);
       for (const f of allFields) {
         if (["text", "date", "time", "textarea"].includes(f.type)) {
-          data[f.key] = form.querySelector(`[data-key="${f.key}"]`).value.trim();
+          const v = form.querySelector(`[data-key="${f.key}"]`).value.trim();
+          data[f.key] = f.prefix ? (v ? f.prefix + v : "") : v;
         } else if (f.type === "checkbox") {
           data[f.key] = form.querySelector(`[data-key="${f.key}"]`).checked;
         } else if (f.type === "checklist") {
