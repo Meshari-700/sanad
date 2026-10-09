@@ -963,3 +963,12 @@ a { color: inherit; text-decoration: none; }
   cursor: pointer;
 }
 .directive.is-expandable { cursor: pointer; }
+
+/* الجهات المشاركة بمحضر الحملة */
+.ent-item + .ent-item { border-top: 1.5px solid var(--border); }
+.ent-panel {
+  background: var(--primary-tint-2);
+  border-radius: var(--radius);
+  padding: 14px 14px 4px;
+  margin-bottom: 12px;
+}

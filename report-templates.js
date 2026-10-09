@@ -5,7 +5,7 @@
 // مأخوذة من ملفات القوالب الأصلية. x للنص = الحافة اليمنى (الكتابة عربية).
 //
 // أنواع الحقول بالنموذج:
-//   text | date | time | textarea | checkbox | checklist | products | signature
+//   text | date | time | textarea | checkbox | checklist | products | signature | entities
 // ==================================================================
 
 const PAGE_W = 595.32;
@@ -277,7 +277,124 @@ const TPL_CASE_CARDS = {
   },
 };
 
-const REPORT_TEMPLATES = [TPL_SEIZURE, TPL_CASE_GENERAL, TPL_CASE_CARDS];
+
+// ----------------------------------------------------------------
+// 4) محضر الحملة النهائي
+// ----------------------------------------------------------------
+// خانات الأيام (☐ قبل اسم اليوم) — getDay(): 0 الأحد ... 5 الجمعة (السبت مو بالقالب)
+const CAMPAIGN_DAY_BOXES = { 0: 428.75, 1: 389.35, 2: 345.85, 3: 300.65, 4: 251.25, 5: 203.15 };
+const CAMPAIGN_ROW_TOPS = [419.3, 438.5, 457.6, 476.7, 495.9, 515.0, 534.1, 553.3, 572.3, 591.4, 610.6]; // ارتفاع ~18.7
+const CAMPAIGN_MUNI_TOP = 665.0; // أول سطر بجدول البلدية (ارتفاع ~14.4)
+
+const CAMPAIGN_ENTITIES = [
+  { id: "emirate", label: "إمارة المنطقة" },
+  { id: "amanah", label: "الأمانة" },
+  { id: "sub_muni", label: "البلدية الفرعية" },
+  { id: "security", label: "الأمن العام" },
+  { id: "transport", label: "هيئة النقل العام" },
+  { id: "sfda", label: "هيئة الغذاء والدواء" },
+  { id: "civil_defense", label: "المديرية العامة للدفاع المدني" },
+  { id: "commerce", label: "وزارة التجارة" },
+  { id: "health", label: "وزارة الصحة" },
+  { id: "hrsd", label: "وزارة الموارد البشرية والتنمية الاجتماعية" },
+  { id: "other", label: "أخرى", custom: true },
+];
+
+const TPL_CAMPAIGN = {
+  key: "campaign",
+  title: "محضر الحملة النهائي",
+  image: "template-campaign.jpg",
+  shopKey: "scope",
+  sections: [
+    {
+      title: "بيانات الجولة",
+      fields: [
+        { type: "date", key: "date", label: "التاريخ", required: true, defaultToday: true, weekdayHint: true },
+        { type: "time", key: "time", label: "الساعة", required: true, defaultNow: true },
+        { type: "text", key: "scope", label: "النطاق", required: true },
+      ],
+    },
+    {
+      title: "الإنجاز",
+      fields: [
+        { type: "text", key: "visits", label: "عدد الزيارات", inputmode: "numeric" },
+        { type: "text", key: "closures", label: "عدد الإغلاقات", inputmode: "numeric" },
+        { type: "text", key: "destructions", label: "عدد الإتلافات", inputmode: "numeric" },
+      ],
+    },
+    {
+      title: "الجهات المشاركة",
+      fields: [{ type: "entities", key: "entities", items: CAMPAIGN_ENTITIES }],
+    },
+    {
+      title: "البلدية",
+      fields: [
+        { type: "text", key: "municipality", label: "البلدية" },
+        { type: "text", key: "inspector_name", label: "اسم المراقب", required: true, fromProfile: true },
+        { type: "signature", key: "inspector_sig", label: "توقيع المراقب", required: true },
+      ],
+    },
+    {
+      title: "ملاحظة",
+      fields: [{ type: "textarea", key: "notes", label: "ملاحظة (اختياري)", rows: 4 }],
+    },
+  ],
+  pageCount: () => 1,
+  validate: () => "",
+  render(R, d, sig) {
+    // اليوم
+    if (d.date) {
+      const [y, m, dd] = d.date.split("-").map(Number);
+      const box = CAMPAIGN_DAY_BOXES[new Date(y, m - 1, dd, 12).getDay()];
+      if (box) R.check(box, 218.7);
+      const g = d.date.split("-");
+      R.white(380, 227, 433, 240);
+      R.text(`${g[2]}/${g[1]}/${g[0]}`, 431, 237, { size: 10.5 });
+    }
+    // الساعة + صباحًا/مساءً
+    if (d.time) {
+      let [h, mi] = d.time.split(":").map(Number);
+      R.check(h < 12 ? 374.65 : 413.45, 249.1);
+      h = h % 12 || 12;
+      R.white(419.5, 244, 434, 256);
+      R.text(`${h}:${String(mi).padStart(2, "0")}`, 470, 253, { size: 10.5, maxWidth: 36 });
+    }
+    // النطاق
+    R.white(419, 258, 434, 270);
+    R.text(d.scope, 433, 267, { size: 10.5, maxWidth: 330 });
+
+    // الأعداد
+    [[d.visits, 322.4], [d.closures, 336.0], [d.destructions, 349.7]].forEach(([v, top]) =>
+      R.center(v, 396, 431, top, top + 11, { size: 10, weight: 700 })
+    );
+
+    // الجهات المشاركة
+    const ents = d.entities || {};
+    CAMPAIGN_ENTITIES.forEach((e, i) => {
+      const v = ents[e.id];
+      if (!v || !v.on) return;
+      const top = CAMPAIGN_ROW_TOPS[i];
+      R.check(493.35, top + 9.6, 0.85);
+      if (e.custom && v.label) R.text(v.label, 443, top + 13.5, { size: 9.5, maxWidth: 115 });
+      R.center(v.name, 196, 321, top, top + 18.7, { size: 9 });
+      R.sign(sig["ent_" + e.id], 96, top + 1.5, 188, top + 17.5);
+    });
+
+    // البلدية (أول سطر)
+    const mt = CAMPAIGN_MUNI_TOP;
+    R.center(d.municipality, 325, 503, mt, mt + 14.4, { size: 9 });
+    R.center(d.inspector_name, 196, 321, mt, mt + 14.4, { size: 9 });
+    R.sign(sig.inspector_sig, 96, mt + 0.8, 188, mt + 13.8);
+
+    // الملاحظة بالفراغ آخر الصفحة
+    if (d.notes) {
+      R.text("ملاحظة:", 504, 738, { size: 11, weight: 700, color: "#111" });
+      R.wrap(d.notes, 504, 414, [756, 772, 788, 804], { size: 10 });
+    }
+  },
+};
+
+const REPORT_TEMPLATES = [TPL_SEIZURE, TPL_CASE_GENERAL, TPL_CASE_CARDS, TPL_CAMPAIGN];
 
 function getReportTemplate(key) {
   return REPORT_TEMPLATES.find((t) => t.key === key) || null;

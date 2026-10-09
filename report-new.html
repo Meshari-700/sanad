@@ -69,7 +69,8 @@
         case "date":
           return `<div class="field"><label for="${id}">${escapeHtml(f.label)}</label>
             <input id="${id}" data-key="${f.key}" type="date" />
-            ${f.hijriHint ? `<div class="date-hint" data-hijri-for="${f.key}"></div>` : ""}</div>`;
+            ${f.hijriHint ? `<div class="date-hint" data-hijri-for="${f.key}"></div>` : ""}
+            ${f.weekdayHint ? `<div class="date-hint" data-weekday-for="${f.key}"></div>` : ""}</div>`;
         case "time":
           return `<div class="field"><label for="${id}">${escapeHtml(f.label)}</label>
             <input id="${id}" data-key="${f.key}" type="time" /></div>`;
@@ -84,6 +85,20 @@
               <input type="checkbox" id="ck_${it.id}" data-item="${it.id}" />
               <label for="ck_${it.id}">${escapeHtml(it.label)}</label>
               ${f.withCount && it.count ? `<input class="count-input" type="number" inputmode="numeric" min="1" max="999" placeholder="العدد" data-count="${it.id}" disabled aria-label="العدد" />` : ""}
+            </div>`).join("")}</div>`;
+        case "entities":
+          return `<div data-entities="${f.key}">${f.items.map((e) => `
+            <div class="ent-item">
+              <label class="check-row" style="padding:10px 0"><input type="checkbox" data-ent="${e.id}" /><span>${escapeHtml(e.label)}</span></label>
+              <div class="ent-panel hidden" data-ent-panel="${e.id}">
+                ${e.custom ? `<div class="field"><label>اسم الجهة</label><input type="text" data-ent-label="${e.id}" maxlength="80" /></div>` : ""}
+                <div class="field"><label>اسم الممثل</label><input type="text" data-ent-name="${e.id}" maxlength="80" /></div>
+                <div class="field">
+                  <label>التوقيع</label>
+                  <div class="sig-box"><canvas data-sig="ent_${e.id}"></canvas><span class="sig-placeholder">وقّع هنا</span></div>
+                  <div class="sig-actions"><button type="button" class="link-btn" data-sig-clear="ent_${e.id}">مسح التوقيع</button></div>
+                </div>
+              </div>
             </div>`).join("")}</div>`;
         case "products":
           return `<div data-products="${f.key}"></div>
@@ -165,6 +180,15 @@
       });
 
       form.addEventListener("change", (e) => {
+        const ent = e.target.dataset.ent;
+        if (ent) {
+          const panel = form.querySelector(`[data-ent-panel="${ent}"]`);
+          panel.classList.toggle("hidden", !e.target.checked);
+          if (e.target.checked) {
+            pads["ent_" + ent].refresh();
+            panel.querySelector("input").focus();
+          }
+        }
         const item = e.target.dataset.item;
         if (item) {
           const count = form.querySelector(`[data-count="${item}"]`);
@@ -206,6 +230,14 @@
         const h = hijriParts(v);
         el.textContent = h ? `يوافق ${h.year}/${h.month}/${h.day} هـ` : "";
       });
+      $("form").querySelectorAll("[data-weekday-for]").forEach((el) => {
+        const v = $("form").querySelector(`[data-key="${el.dataset.weekdayFor}"]`).value;
+        if (!v) { el.textContent = ""; return; }
+        const [y, m, d] = v.split("-").map(Number);
+        const day = new Date(y, m - 1, d, 12).getDay();
+        const names = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+        el.textContent = day === 6 ? "السبت (ما له خانة في المحضر)" : names[day];
+      });
     }
 
     // ---------------------------------------------
@@ -233,6 +265,17 @@
             }
           }
           data[f.key] = out;
+        } else if (f.type === "entities") {
+          const out = {};
+          for (const e of f.items) {
+            if (!form.querySelector(`[data-ent="${e.id}"]`).checked) continue;
+            out[e.id] = {
+              on: true,
+              name: form.querySelector(`[data-ent-name="${e.id}"]`).value.trim(),
+              ...(e.custom ? { label: form.querySelector(`[data-ent-label="${e.id}"]`).value.trim() } : {}),
+            };
+          }
+          data[f.key] = out;
         } else if (f.type === "products") {
           data[f.key] = Array.from(form.querySelectorAll(`[data-products="${f.key}"] .product-block`))
             .map((b) => Object.fromEntries(Array.from(b.querySelectorAll("[data-col]")).map((i) => [i.dataset.col, i.value.trim()])))
@@ -248,6 +291,13 @@
         if (f.hiddenWhen && data[f.hiddenWhen]) continue;
         sigs[f.key] = pads[f.key].toDataURL();
       }
+      // توقيعات الجهات المحددة (اختيارية)
+      for (const f of tpl.sections.flatMap((s) => s.fields).filter((x) => x.type === "entities")) {
+        for (const id of Object.keys(data[f.key] || {})) {
+          const url = pads["ent_" + id].toDataURL();
+          if (url) sigs["ent_" + id] = url;
+        }
+      }
       return sigs;
     }
 
@@ -262,8 +312,14 @@
           if (data[f.key].some((p) => !p.name)) return "اكتب اسم كل منتج.";
           continue;
         }
+        if (f.type === "entities") {
+          const bad = f.items.find((e) => e.custom && data[f.key][e.id] && !data[f.key][e.id].label);
+          if (bad) return "اكتب اسم الجهة الأخرى.";
+          continue;
+        }
         if (f.required && !data[f.key]) return `اكتب ${f.label}.`;
       }
+      if (typeof tpl.validate === "function") return tpl.validate(data);
       if (tpl.key === "seizure") {
         const r = data.reasons || {};
         if (!r.expired && !r.damaged && !r.pests && !data.other_reason) return "حدد سبب الضبط.";
