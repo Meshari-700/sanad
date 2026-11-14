@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#126151" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="سند" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="apple-touch-icon" href="icon-180.png" />
+  <link rel="icon" href="icon.png" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://cttooytoziipdcasliah.supabase.co" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <title>زيارة غير مجدولة — سند</title>
+</head>
+<body>
+  <header id="appHeader"></header>
+
+  <main class="page">
+    <a class="breadcrumb" href="tool-unscheduled.html" id="crumb">الزيارات غير المجدولة</a>
+    <h1 class="page-title" style="margin-bottom:18px" id="pageTitle">زيارة غير مجدولة</h1>
+
+    <section class="card form-section">
+      <div class="card-head">بيانات الزيارة</div>
+      <div class="field"><label for="date">التاريخ</label><input id="date" type="date" /></div>
+      <div class="field">
+        <label for="visitNo">رقم الزيارة</label>
+        <div class="prefix-input"><span>INS-</span>
+          <input id="visitNo" data-digits type="text" inputmode="numeric" maxlength="30" autocomplete="off" /></div>
+      </div>
+    </section>
+
+    <section class="card form-section">
+      <div class="card-head">سبب فتح الزيارة</div>
+      <div id="reasons"></div>
+      <div class="field hidden" id="otherWrap" style="margin-top:10px">
+        <label for="otherReason">اكتب السبب</label>
+        <input id="otherReason" type="text" maxlength="200" />
+      </div>
+    </section>
+
+    <section class="card form-section">
+      <div class="field">
+        <label for="prevNo">رقم الزيارة السابقة أو البلاغ (اختياري)</label>
+        <div class="prefix-input"><span>INS-</span>
+          <input id="prevNo" data-digits type="text" inputmode="numeric" maxlength="30" autocomplete="off" /></div>
+      </div>
+    </section>
+
+    <p class="msg error" id="formMsg" role="alert" style="margin-top:14px"></p>
+    <div class="sticky-actions">
+      <button class="btn block" id="saveBtn">حفظ الزيارة</button>
+    </div>
+  </main>
+
+  <nav id="bottomNav"></nav>
+
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="utils.js"></script>
+  <script src="directives.js"></script>
+  <script src="layout.js"></script>
+  <script src="unscheduled.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const editId = getParam("id");
+    let dirty = false;
+    let originalNumber = null;
+
+    function todayISO() {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    }
+
+    function digitsOf(value) {
+      return (value || "").replace(/^INS-/, "");
+    }
+
+    function toggleOther() {
+      const other = document.querySelector('input[name="reason"]:checked')?.value === "other";
+      $("otherWrap").classList.toggle("hidden", !other);
+      return other;
+    }
+
+    function fill(r) {
+      $("date").value = r.visit_date || "";
+      $("visitNo").value = digitsOf(r.visit_number);
+      $("prevNo").value = digitsOf(r.previous_number);
+      const radio = document.querySelector(`input[name="reason"][value="${r.visit_reason}"]`);
+      if (radio) radio.checked = true;
+      $("otherReason").value = r.visit_reason_other || "";
+      toggleOther();
+    }
+
+    function collect() {
+      const visit = $("visitNo").value.trim();
+      const prev = $("prevNo").value.trim();
+      const reason = document.querySelector('input[name="reason"]:checked')?.value || "";
+      return {
+        visit_date: $("date").value,
+        visit_number: visit ? "INS-" + visit : "",
+        visit_reason: reason,
+        visit_reason_other: reason === "other" ? $("otherReason").value.trim() || null : null,
+        previous_number: prev ? "INS-" + prev : null,
+      };
+    }
+
+    function validate(v) {
+      if (!v.visit_date) return "اختر التاريخ.";
+      if (!v.visit_number) return "اكتب رقم الزيارة.";
+      if (!v.visit_reason) return "اختر سبب فتح الزيارة.";
+      if (v.visit_reason === "other" && !v.visit_reason_other) return "اكتب سبب فتح الزيارة.";
+      return "";
+    }
+
+    function resetBtn() {
+      $("saveBtn").disabled = false;
+      $("saveBtn").textContent = editId ? "حفظ التعديل" : "حفظ الزيارة";
+    }
+
+    async function save() {
+      const v = collect();
+      const problem = validate(v);
+      $("formMsg").textContent = problem;
+      if (problem) return;
+      $("saveBtn").disabled = true;
+      $("saveBtn").textContent = "جارٍ الحفظ...";
+      try {
+        // تنبيه عند تكرار رقم الزيارة (لا يمنع الحفظ)
+        if (v.visit_number !== originalNumber) {
+          let count = 0;
+          try { count = await countUnscheduledByNumber(v.visit_number, editId); } catch (e) {}
+          if (count > 0) {
+            const ok = await confirmDialog({
+              title: "رقم الزيارة مسجّل مسبقًا",
+              message: `توجد زيارة مسجّلة بالرقم ${v.visit_number}. هل تريد المتابعة بالحفظ؟`,
+              confirmText: "متابعة الحفظ",
+            });
+            if (!ok) { resetBtn(); return; }
+          }
+        }
+        await saveUnscheduledVisit(v, editId);
+        dirty = false;
+        window.location.replace("tool-unscheduled.html?saved=" + (editId ? "edit" : "new"));
+      } catch (e) {
+        const m = (e && e.message) || "";
+        $("formMsg").textContent = /fetch|network/i.test(m) ? "تعذر الاتصال، حاول مرة أخرى" : "تعذر حفظ الزيارة، حاول مرة أخرى";
+        resetBtn();
+      }
+    }
+
+    (async () => {
+      const profile = await requireAuth();
+      if (!profile) return;
+      renderShell("tools");
+      $("crumb").insertAdjacentHTML("afterbegin", svgIcon("chevron", "icon-sm"));
+
+      $("reasons").innerHTML = Object.entries(UNSCHEDULED_REASONS).map(([value, label]) => `
+        <label class="check-item" style="cursor:pointer">
+          <input type="radio" name="reason" value="${value}" style="width:22px;height:22px;accent-color:var(--primary);flex-shrink:0;margin-top:2px" />
+          <span style="flex:1">${escapeHtml(label)}</span>
+        </label>`).join("");
+
+      $("reasons").addEventListener("change", () => { if (toggleOther()) $("otherReason").focus(); });
+      document.querySelector("main").addEventListener("input", (e) => {
+        dirty = true;
+        if (e.target.hasAttribute("data-digits")) {
+          e.target.value = e.target.value.replace(/[٠-٩]/g, (c) => "٠١٢٣٤٥٦٧٨٩".indexOf(c)).replace(/\D/g, "");
+        }
+      });
+      document.querySelector("main").addEventListener("change", () => { dirty = true; });
+      // الضغط على حقل التاريخ يفتح التقويم مباشرة
+      $("date").addEventListener("click", () => { try { $("date").showPicker(); } catch (e) {} });
+      $("saveBtn").addEventListener("click", save);
+      window.addEventListener("beforeunload", (e) => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
+
+      if (editId) {
+        $("pageTitle").textContent = "تعديل الزيارة";
+        $("saveBtn").textContent = "حفظ التعديل";
+        try {
+          const r = await fetchUnscheduledVisit(editId);
+          if (!r || r.created_by !== profile.id) {
+            $("formMsg").textContent = "لا يمكنك تعديل هذه الزيارة.";
+            $("saveBtn").disabled = true;
+            return;
+          }
+          originalNumber = r.visit_number;
+          fill(r);
+        } catch (e) {
+          $("formMsg").textContent = "تعذر التحميل، تحقق من الاتصال";
+          $("saveBtn").disabled = true;
+        }
+      } else {
+        $("date").value = todayISO();
+      }
+    })();
+  </script>
+</body>
+</html>
